@@ -34,7 +34,22 @@ measurement.
 | [7](day07/README.md) | Warp intrinsics, reduction and atomics |
 | [8](day08/README.md) | Streams, events, asynchrony and CUDA graphs |
 | [9](day09/README.md) | Libraries, tensor cores and precision |
-| [10](day10/README.md) | Profiling method, feasibility and thesis topics |
+| [10](day10/README.md) | Discussion of proposals |
+
+## Lessons and labs
+
+| Day | Lesson | Lab |
+|---|---|---|
+| 1 | Programming model, SM, memory hierarchy | `report_device_capabilities()`, first kernel, record the GPU's own numbers |
+| 2 | Thread, block, grid, indexing, occupancy | Vector addition, then 2D indexing over two images |
+| 3 | SIMT pipeline, warp, divergence, latency hiding | Vector add timed against a CPU loop, then BGR to grayscale |
+| 4 | Paged, pinned, mapped, unified memory; transfers | Pinned against pageable transfer, compared in Nsight Systems |
+| 5 | Shared memory, banks, conflicts, tiling | Tiled 2D filter with a halo, then Sobel |
+| 6 | Coalescing, sectors, L1/L2, coarsening | Optimise the Day 5 filter, report percentage of peak bandwidth |
+| 7 | Warp shuffle, reduction, scan, atomics | Image mean by warp reduction; histogram, global against privatised |
+| 8 | Streams, events, async copy, CUDA graphs | Chunked pipeline across streams, then captured as a graph |
+| 9 | cuBLAS, cuDNN, tensor cores, precision | Replace hand-written kernels with library calls, enable tensor cores |
+| 10 | Discussion | Participants present their proposals |
 
 Each day folder contains that day's `README.md` and a `template.cu` to start from.
 Shared helpers are in [`common/`](common): `cuda_check.h`, `device_info.h`, `timer.h`.
