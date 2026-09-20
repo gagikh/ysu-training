@@ -19,7 +19,7 @@
 A block is assigned to one SM and stays there until it finishes. How many blocks fit on an SM at once is decided by three limits at the same time: registers per thread, shared memory per block, and the hardware cap on resident blocks. The lowest of the three wins. This is why block size is a hardware question, not a style question.
 
 ## Resources
-- CUDA Programming Guide — Thread Hierarchy
+- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 2. Programming Model · 5. Performance Guidelines
 - CUDA C++ Best Practices Guide — Occupancy, Coalesced Access to Global Memory
 
 ## Hands-On Task

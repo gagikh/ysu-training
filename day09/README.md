@@ -18,7 +18,7 @@
 On consumer and inference-class cards fp64 runs at 1/32 to 1/64 of the fp32 rate; on datacentre cards it is closer to 1/2. Determine which case applies to the cluster GPU from the Day 1 numbers before designing any double-precision work.
 
 ## Resources
-- CUDA Programming Guide — Warp Matrix Functions, Cooperative Groups
+- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 7.24. Warp Matrix Functions · 8. Cooperative Groups
 - Train With Mixed Precision: https://docs.nvidia.com/deeplearning/performance/
 - Micikevicius P. et al. Mixed Precision Training. *ICLR*, 2018. arXiv:1710.03740
 - cuBLAS, cuFFT, cuRAND: https://docs.nvidia.com/cuda/ · cuDNN: https://docs.nvidia.com/deeplearning/cudnn/

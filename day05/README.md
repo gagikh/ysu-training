@@ -15,7 +15,7 @@
 - Tiling as a reduction in global memory traffic
 
 ## Resources
-- CUDA Programming Guide — Shared Memory
+- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 3.2.4. Shared Memory
 - CUDA C++ Best Practices Guide — Shared Memory
 - Bank conflict diagrams and stride explorer: [`day05/`](https://github.com/gagikh/cuda/tree/main/day05)
 

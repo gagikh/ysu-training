@@ -20,7 +20,7 @@
 Shuffles move data register to register, touching no memory at all. That is why they beat a shared-memory reduction, and also why the advantage disappears once the data no longer fits in a warp's registers.
 
 ## Resources
-- CUDA Programming Guide — Warp Shuffle Functions, Warp Vote Functions, Atomic Functions
+- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 7.22. Warp Shuffle Functions · 7.14. Atomic Functions · 8. Cooperative Groups
 - [`INTRINSICS.md`](https://github.com/gagikh/cuda/blob/main/INTRINSICS.md) — shuffle, vote, bit operations, atomics in one table
 - CUB device-wide reduction and scan: https://nvidia.github.io/cccl/cub/
 

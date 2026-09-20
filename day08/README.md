@@ -17,7 +17,7 @@
 Day 4 established that the link is often the limit. Streams are the answer: while chunk *n* is computed, chunk *n+1* is being copied in and chunk *n-1* copied out. The ceiling is then the larger of the two rates, not their sum.
 
 ## Resources
-- CUDA Programming Guide — Asynchronous Concurrent Execution, CUDA Graphs
+- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 3.2.8. Asynchronous Concurrent Execution · 3.2.8.7. CUDA Graphs
 - CUDA C++ Best Practices Guide — Asynchronous Transfers and Overlapping Transfers with Computation
 - Nsight Systems — User Guide, timeline view
 

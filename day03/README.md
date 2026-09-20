@@ -18,7 +18,7 @@
 A CPU reduces memory latency with deep cache hierarchies and speculation. A GPU largely does not: it tolerates the latency instead. When a warp stalls on a load, the scheduler issues an instruction from another resident warp in the same cycle. This single decision explains occupancy, why block size matters, why divergence is expensive, and why arithmetic intensity determines performance. Everything later in the course is a consequence of it.
 
 ## Resources
-- CUDA Programming Guide — Hardware Implementation, Maximize Utilization
+- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 4. Hardware Implementation · 5. Performance Guidelines
 - Oxford CUDA course, lecture 3: https://people.maths.ox.ac.uk/~gilesm/cuda/lecs/lec3.pdf
 - Using CUDA warp-level primitives: https://developer.nvidia.com/blog/using-cuda-warp-level-primitives/
 - Pipeline and warp scheduling diagrams: [`day03/`](https://github.com/gagikh/cuda/tree/main/day03), [`warp_animations.html`](https://github.com/gagikh/cuda/blob/main/day03/warp_animations.html)

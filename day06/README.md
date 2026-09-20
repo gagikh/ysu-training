@@ -20,6 +20,7 @@
 Measure achieved bandwidth, divide by the peak figure computed on Day 1, and place the kernel on a roofline. Below roughly half of peak there is usually something structural to fix. Above roughly 80 percent the remaining work is algorithmic — fewer bytes moved, not faster movement.
 
 ## Resources
+- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 3.2.3. Device Memory L2 Access Management · 5. Performance Guidelines
 - CUDA C++ Best Practices Guide — Coalesced Access to Global Memory, L2 Cache
 - Nsight Compute — Profiling Guide, memory chart and sectors per request
 - Williams S., Waterman A., Patterson D. Roofline: An Insightful Visual Performance Model. *CACM* 52(4), 2009

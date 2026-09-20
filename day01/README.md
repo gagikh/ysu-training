@@ -22,7 +22,7 @@ Participants already write OpenMP and MPI. Two contrasts are worth making explic
 - **Against MPI.** Host and device memory are separate address spaces with explicit transfers, which is familiar. What is different is that the transfer cost is not a network cost but a PCIe or NVLink cost, and it is usually the first thing that limits a naive port.
 
 ## Resources
-- CUDA Programming Guide — Programming Model, Hardware Implementation, Compute Capabilities
+- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 2. Programming Model · 4. Hardware Implementation · 16. Compute Capabilities
 - CUDA C++ Best Practices Guide — Assess, Parallelize, Optimize, Deploy
 - SM anatomy diagram and animations: [`sm_anatomy.svg`](https://github.com/gagikh/cuda/blob/main/sm_anatomy.svg), [`sm_animations.html`](https://github.com/gagikh/cuda/blob/main/sm_animations.html)
 - [`ARCHITECTURE.md`](https://github.com/gagikh/cuda/blob/main/ARCHITECTURE.md) — what is inside an SM, in detail

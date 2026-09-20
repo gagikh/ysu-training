@@ -67,8 +67,10 @@ whether a student's proposed project is possible at all.
 
 **Primary**
 
-- NVIDIA. *CUDA Programming Guide* — https://docs.nvidia.com/cuda/cuda-programming-guide/ (v13.4.2, 10 Sep 2026). This replaces the *CUDA C++ Programming Guide*, which the document itself marks as no longer updated since CUDA 13.0.
+- NVIDIA. *CUDA C Programming Guide* (PDF) — https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf
+  The course's primary reading. Each day's `Resources` section names the exact chapters for that session.
 - NVIDIA. *CUDA C++ Best Practices Guide* — https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/ (v13.4, current)
+- NVIDIA. *CUDA Programming Guide* (HTML, v13.4.2) — https://docs.nvidia.com/cuda/cuda-programming-guide/
 - Hwu W., Kirk D., El Hajj I. *Programming Massively Parallel Processors*, 5th ed., Elsevier, 2026
 
 **Profiling**

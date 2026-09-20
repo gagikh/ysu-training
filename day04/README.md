@@ -17,7 +17,7 @@
 Device memory bandwidth is measured in hundreds of GB/s to several TB/s. PCIe is an order of magnitude below that. A kernel that transfers its input, computes once over it, and transfers the result back is limited by the link, not by the GPU. This is the first thing to check when a ported kernel disappoints, and it is the reason streams exist (Day 8).
 
 ## Resources
-- CUDA Programming Guide — Device Memory, Unified Memory Programming
+- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 3.2.2. Device Memory · 3.2.6. Page-Locked Host Memory · 19. Unified Memory Programming
 - CUDA C++ Best Practices Guide — Memory Optimizations, Pinned Memory
 - Nsight Systems — User Guide
 
