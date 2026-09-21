@@ -13,8 +13,44 @@
 - Chunked pipelines: copy, compute and copy-back in flight at once
 - Graph capture, instantiation and launch; launch overhead amortisation
 
+## Definitions
+**Stream** — An ordered queue of GPU operations, kernels and copies. Operations in different streams may run concurrently; operations within one stream execute in issue order.
+
+**Default stream (per-thread)** — The stream used when none is named. Compiled with `--default-stream per-thread`, each host thread gets its own default stream, which does not serialise against other streams.
+
+**`cudaMemcpyAsync`** — A copy issued into a stream, returning immediately. It is genuinely asynchronous only when the host memory is page-locked; with pageable memory the runtime falls back to a synchronous copy and does not report it.
+
+**Event** — A marker placed in a stream with `cudaEventRecord`, which completes when all work preceding it in that stream completes. Used to wait, `cudaEventSynchronize`, and to measure, `cudaEventElapsedTime`.
+
+**Stream dependency** — Ordering between streams, expressed by recording an event in one and having another wait on it with `cudaStreamWaitEvent`.
+
+**Device-side timing** — Measuring with events rather than a host clock, so the interval measured is the GPU's and excludes host-side launch latency.
+
+**Double buffering** — Splitting the input into chunks and using two or more sets of buffers and streams, so that while chunk n is computed, chunk n+1 is copied in and chunk n-1 copied out. The ceiling becomes the larger of the transfer and compute rates rather than their sum.
+
+**CUDA graph** — A recorded directed acyclic graph of operations — kernels, copies, host callbacks — together with their dependencies, launched as one unit.
+
+**Graph capture** — Recording a sequence of stream operations into a graph instead of executing it, between `cudaStreamBeginCapture` and `cudaStreamEndCapture`.
+
+**Instantiation** — Turning a captured graph into an executable graph with `cudaGraphInstantiate`. Done once; the work of validating and preparing the launches is paid here instead of at every launch.
+
+**Launch overhead** — The host-side cost of issuing one kernel launch. It is what graphs remove, and it matters when a fixed sequence of short kernels runs many times.
+
 ## Where this connects to Day 4
 Day 4 established that the link is often the limit. Streams are the answer: while chunk *n* is computed, chunk *n+1* is being copied in and chunk *n-1* copied out. The ceiling is then the larger of the two rates, not their sum.
+
+## Visual
+![A single default stream running H2D copy, kernel and D2H copy back to back, next to two streams where one stream's copy overlaps another stream's kernel](streams_timeline.svg)
+
+The default stream runs everything in order, so the compute units are idle during both copies. With two or more streams the copy engine and the compute engine work at the same time. Events are how the saving is measured.
+
+![Four streams pipelined: each chunk's H2D copy, kernel and D2H copy staggered so that a later chunk's copy overlaps an earlier chunk's compute](async_pipeline.svg)
+
+The pattern the hands-on task builds: split the input into chunks, put each chunk's copy-in, compute and copy-out on its own stream, and issue them so consecutive chunks overlap. It only works with pinned host buffers (Day 4); otherwise `cudaMemcpyAsync` falls back to synchronous behaviour without saying so.
+
+![Without a graph, every iteration re-pays the CPU launch cost for each launch; with a captured graph, the sequence is captured and instantiated once and then replayed with a single cudaGraphLaunch per iteration](cuda_graph.svg)
+
+Graphs do not make the GPU compute faster. They remove the CPU-side cost of re-issuing the same sequence of launches, which is visible only when a fixed pipeline runs many times.
 
 ## Resources
 - [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 3.2.8. Asynchronous Concurrent Execution · 3.2.8.7. CUDA Graphs

@@ -22,5 +22,5 @@ and 6, the library and precision trade-offs from Day 9.
 ## Resources
 
 - [`topics-bank.md`](topics-bank.md) — worked examples to take from or adapt
-- [`PERFORMANCE.md`](https://github.com/gagikh/cuda/blob/main/PERFORMANCE.md) — optimisation order and stopping criteria
-- [`TASKS.md`](https://github.com/gagikh/cuda/blob/main/TASKS.md) — 100 practice tasks from the student course
+- [`PERFORMANCE.md`](../PERFORMANCE.md) — optimisation order and stopping criteria
+- [`TASKS.md`](../TASKS.md) — 100 practice tasks from the student course

@@ -15,8 +15,43 @@
 - Occupancy and block-size choice (first pass; the hardware reason comes on Day 3 and Day 6)
 - Grid-stride loops
 
+## Definitions
+**Thread** — The smallest unit of execution; identified within its block by `threadIdx`, within the grid by combining `threadIdx` with `blockIdx` and `blockDim`.
+
+**Block** — A group of threads, up to `maxThreadsPerBlock`, that execute on the same SM and can cooperate through shared memory and `__syncthreads()`. A kernel launch creates a grid of blocks.
+
+**Grid** — The full set of blocks launched by one kernel call, `<<<grid, block>>>`.
+
+**Launch configuration** — The arguments of a kernel call: grid dimensions in blocks and block dimensions in threads, each up to three-dimensional, plus optional dynamic shared memory size and stream.
+
+**`blockIdx`, `threadIdx`, `blockDim`, `gridDim`** — Built-in read-only variables in device code: the block's index in the grid, the thread's index in the block, the block's dimensions, the grid's dimensions.
+
+**Resident blocks** — The blocks assigned to one SM at the same time. The count is the smallest of three limits: the hardware cap on blocks per SM, registers per SM divided by the block's register demand, and shared memory per SM divided by the block's shared memory demand.
+
+**Occupancy** — How many warps are resident on an SM at once relative to the maximum it could hold. Limited by whichever resource runs out first: registers per thread, shared memory per block, or the thread-count cap. It is a means to **latency hiding**, not a goal — returns flatten past roughly 50 percent, and coarsened kernels trade it away deliberately.
+
+**`cudaOccupancyMaxActiveBlocksPerMultiprocessor`** — The runtime call returning how many blocks of a given kernel and block size will be resident per SM, without running the kernel.
+
+**Coalescing (memory coalescing)** — When the 32 lanes of a warp access consecutive addresses, the hardware serves them in a single 128-byte transaction instead of up to 32 separate ones. The property belongs to the warp, not the thread: what matters is the combined footprint of one instruction across all 32 lanes, not the pattern one thread traces over time.
+
+**Grid-stride loop** — A launch pattern where a fixed number of threads each process several elements in a loop, striding by the total thread count, instead of sizing the grid to match the data. Correct for any input size without recomputing launch dimensions.
+
 ## How a block is placed
 A block is assigned to one SM and stays there until it finishes. How many blocks fit on an SM at once is decided by three limits at the same time: registers per thread, shared memory per block, and the hardware cap on resident blocks. The lowest of the three wins. This is why block size is a hardware question, not a style question.
+
+## Visual
+![A grid of blocks, each block a 2D array of threads, with the global-index formula shown](thread_hierarchy.svg)
+
+A launch creates a grid of blocks, and each block is itself a 1D, 2D or 3D array of threads. `blockIdx` says which block a thread is in, `threadIdx` which slot inside that block. The formula in the diagram is the one reused in almost every kernel that follows.
+
+## Animated
+![The global-index formula evaluated for four threads across three blocks, each cycling through blockIdx.x, blockDim.x and threadIdx.x to a concrete number](thread_indexing.svg)
+
+One formula, four concrete threads. It is always `blockIdx.x * blockDim.x + threadIdx.x`; only the block and thread values change.
+
+![Four fixed threads sweeping a 16-element array in stride-4 iterations, each thread taking a different element every iteration](grid_stride_loop.svg)
+
+Four threads cover sixteen elements in four iterations. Doubling the array to thirty-two gives eight iterations at the same launch configuration. This is the grid-stride loop of the hands-on task.
 
 ## Resources
 - [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 2. Programming Model · 5. Performance Guidelines

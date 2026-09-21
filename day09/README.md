@@ -14,6 +14,23 @@
 - Non-determinism of atomic accumulation and what reproducibility claims require
 - Cooperative groups: `tiled_partition`, group-typed shuffles, grid-wide sync
 
+## Definitions
+**Tensor Core** — Specialised SM hardware, compute capability 7.0 and newer, for fast mixed-precision matrix multiply-accumulate. Used by cuBLAS and cuDNN, and reachable directly through the warp matrix functions.
+
+**MMA (matrix multiply-accumulate)** — The tensor core operation `D = A * B + C` on small matrix fragments, issued as one instruction per warp. Fragment shapes and alignment are fixed by the hardware, which is why dimensions have to be multiples of the fragment size to use it.
+
+**fp64, fp32, tf32, bf16, fp16** — Floating-point formats, given as exponent and mantissa bits. fp64: 11 and 52. fp32: 8 and 23. tf32: 8 and 10, a tensor core input format only. bf16: 8 and 7, the same range as fp32 with less precision. fp16: 5 and 10, narrower range and precision.
+
+**Mixed precision** — Computing in a narrow format while accumulating in a wider one, typically fp16 or bf16 inputs with fp32 accumulation. This is what tensor cores do natively.
+
+**FMA (fused multiply-add)** — `a * b + c` computed with a single rounding instead of two. One reason a GPU result and a CPU result can differ in the last bits for identical inputs in identical order.
+
+**Non-determinism of atomic accumulation** — Atomics do not fix the order in which values are combined, and floating-point addition is not associative, so a kernel accumulating floats with `atomicAdd` can give different results run to run. A reproducibility claim requires a fixed reduction order.
+
+**Grid-wide synchronisation** — A barrier across every block of a grid, available through cooperative groups, and only for kernels launched with `cudaLaunchCooperativeKernel` and sized so that all blocks are resident at once.
+
+**cuBLAS, cuFFT, cuRAND, cuDNN, NPP, nvJPEG, CUB, Thrust** — NVIDIA's libraries: dense linear algebra; fast Fourier transforms; random number generation; deep learning primitives; image and signal processing; JPEG decode and encode; block- and device-level parallel primitives; and an STL-like algorithms layer built on CUB.
+
 ## Precision on your hardware
 On consumer and inference-class cards fp64 runs at 1/32 to 1/64 of the fp32 rate; on datacentre cards it is closer to 1/2. Determine which case applies to the cluster GPU from the Day 1 numbers before designing any double-precision work.
 

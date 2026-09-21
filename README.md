@@ -73,10 +73,10 @@ whether a student's proposed project is possible at all.
 
 ## Reference material
 
-- [Glossary](https://github.com/gagikh/cuda/blob/main/GLOSSARY.md), [Intrinsics cheat sheet](https://github.com/gagikh/cuda/blob/main/INTRINSICS.md)
-- [Architecture deep dive](https://github.com/gagikh/cuda/blob/main/ARCHITECTURE.md), [SM animations](https://github.com/gagikh/cuda/blob/main/sm_animations.html)
-- [Performance checklist](https://github.com/gagikh/cuda/blob/main/PERFORMANCE.md)
-- [100 practice tasks](https://github.com/gagikh/cuda/blob/main/TASKS.md)
+- [Glossary](GLOSSARY.md), [Intrinsics cheat sheet](INTRINSICS.md)
+- [Architecture deep dive](ARCHITECTURE.md), [SM animations](sm_animations.html)
+- [Performance checklist](PERFORMANCE.md)
+- [100 practice tasks](TASKS.md)
 
 ## Bibliography
 
