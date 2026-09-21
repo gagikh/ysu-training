@@ -92,3 +92,5 @@ No answers given.
 
 ## Code Template
 See [`template.cu`](template.cu).
+
+Worked example: [`example.md`](example.md) — the same kernel followed from C++ through PTX to SASS, with real compiler output, and how to embed PTX in device code.
