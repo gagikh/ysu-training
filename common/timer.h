@@ -41,7 +41,7 @@ struct kernel_timer_t
     ~kernel_timer_t()
     {
         // Destructors must not exit() on failure, so these aren't CUDA_CHECK'd
-        // (same reasoning as the RAII wrappers in Day 11 / Day 12).
+        // (a destructor that exits hides the original failure).
         cudaEventDestroy(start_);
         cudaEventDestroy(stop_);
     }

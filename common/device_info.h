@@ -4,8 +4,8 @@
 // replace the abstract "GPU architecture fundamentals" objective with real
 // numbers for the GPU you're actually running on. Nearly every constraint
 // you'll bump into in later days -- max threads per block (Day 2), warp
-// size (Day 3), shared memory per block/SM (Day 5, Day 13), tensor cores
-// (Day 14), memory bandwidth (throughout) -- is printed right here.
+// size (Day 3), shared memory per block/SM (Day 5, Day 6), tensor cores
+// (Day 9), memory bandwidth (throughout) -- is printed right here.
 #pragma once
 
 #include <cstdio>

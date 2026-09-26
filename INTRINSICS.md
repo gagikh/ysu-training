@@ -135,10 +135,9 @@ __device__ int warp_reduce(int val)
 | Day 2 | `threadIdx` / `blockIdx` / `blockDim` / `gridDim` |
 | Day 3 | `warpSize`, `#pragma unroll` |
 | Day 5 | `__syncthreads()` |
-| Day 7 | `__shfl_down_sync`, `__shfl_up_sync`, `__shfl_xor_sync` |
-| Day 7 | `__ballot_sync`, `__all_sync`, `__any_sync`, `atomicAdd`, `__syncwarp` |
-| Day 5 | `__popc` |
 | Day 6 | `__ldg`, `__ldcs` / `__stcs` and the rest of the cache-operator family |
+| Day 7 | `__shfl_down_sync`, `__shfl_up_sync`, `__shfl_xor_sync`, `__shfl_sync` |
+| Day 7 | `__ballot_sync`, `__popc`, `__all_sync`, `__any_sync`, `__activemask`, `__syncwarp`, `atomicAdd` |
 | Day 9 | `curand_uniform`, `curand_init` (library, not strictly intrinsics) |
 
 See also: [GLOSSARY.md](GLOSSARY.md) for the concepts, [ARCHITECTURE.md](ARCHITECTURE.md) for the hardware these instructions run on, and [TASKS.md](TASKS.md) for exercises that use them.
