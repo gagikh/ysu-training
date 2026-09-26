@@ -1,5 +1,11 @@
 # 100 CUDA Practice Tasks
 
+> The day numbers in this file are the **15-day student course's**, not this
+> course's ten days. It is reproduced unchanged so that a task can be matched
+> against its original source. Use [GLOSSARY.md](GLOSSARY.md) to find which day
+> here covers a given concept.
+
+
 A consolidated problem bank: roughly 5 tasks per day, drawn from each day's Self-Learning section, plus 25 bonus tasks (76–100) that go beyond the 15-day structure. Lettered entries (`10a`, `45b`, ...) are later additions kept in place so the original numbering doesn't shift. Each task is tagged with the day whose material it depends on, or `(Bonus)` if no specific day covers it.
 
 Nothing here has an answer key. See [GLOSSARY.md](GLOSSARY.md) if a term is unfamiliar, [PERFORMANCE.md](PERFORMANCE.md) for the optimization tasks, [INTRINSICS.md](INTRINSICS.md) for the device functions, and the relevant `dayNN/README.md` for background before attempting that day's tasks.

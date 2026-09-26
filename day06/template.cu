@@ -1,126 +1,162 @@
 // Day 6: Coalescing, Caches and Bandwidth
-// Goal: apply __ldg and bank-conflict-free shared memory to a real image.
+// Goal: take Day 5's tiled filter to a stated percentage of peak bandwidth.
 //
-// Compile:  nvcc -arch=sm_75 template.cu -o day06 `pkg-config --cflags --libs opencv4`
-// Run:      ./day06 <path-to-image>
+// Build:  cmake -B build && cmake --build build -j
+// Run:    ./build/day06 <image>
+//
+// Day 5's working tiled filter is given below, so the whole session is spent
+// on the optimisations and on the measurement. Five TODOs, three of them one
+// line each.
 
 #include <cstdio>
-#include <cuda_runtime.h>
-#include <opencv2/opencv.hpp>
-#include <opencv2/cudaarithm.hpp>
-#include <opencv2/cudev.hpp>
 #include "../common/cuda_check.h"
+#include "../common/timer.h"
+#include "../common/image_io.h"
 
-#define TILE_DIM 16
+#define TILE 16
 #define RADIUS 1
+#define HALO (TILE + 2 * RADIUS)
 
-// Baseline: the Day 5 tiled filter, unmodified. `in`/`out` are GpuMat
-// pointers; `in_step`/`out_step` are their row pitch in bytes (Day 5+).
-__global__ void tiled_filter_baseline(const unsigned char *in, size_t in_step,
-                                       unsigned char *out, size_t out_step,
-                                       int width, int height)
+__device__ __forceinline__ const unsigned char *row_of(const unsigned char *base,
+                                                       size_t pitch, int y)
 {
-    __shared__ unsigned char tile[TILE_DIM + 2 * RADIUS][TILE_DIM + 2 * RADIUS];
-    // TODO: same body as Day 5's tiled_filter, but index rows via in_step/out_step
+    return base + static_cast<size_t>(y) * pitch;
 }
 
-// TODO 1 (self-learning #1): same filter, but read `in` through __ldg() since it's
-// read-only for the duration of the kernel.
-__global__ void tiled_filter_ldg(const unsigned char *__restrict__ in, size_t in_step,
-                                  unsigned char *out, size_t out_step,
-                                  int width, int height)
+// --------------------------------------------------------------- baseline
+// Day 5's answer, unchanged. This is the figure the rest of the day is
+// measured against.
+__global__ void box_tiled(const unsigned char *in, size_t in_pitch,
+                          unsigned char *out, size_t out_pitch,
+                          int width, int height)
 {
-    __shared__ unsigned char tile[TILE_DIM + 2 * RADIUS][TILE_DIM + 2 * RADIUS];
-    // TODO: load into `tile` using __ldg(&in[row * in_step + col]) instead of
-    // direct indexing
+    __shared__ unsigned char tile[HALO][HALO];
+
+    const int x0 = blockIdx.x * TILE - RADIUS;
+    const int y0 = blockIdx.y * TILE - RADIUS;
+
+    for (int i = threadIdx.y * TILE + threadIdx.x; i < HALO * HALO; i += TILE * TILE) {
+        const int ty = i / HALO, tx = i % HALO;
+        const int sx = min(max(x0 + tx, 0), width - 1);
+        const int sy = min(max(y0 + ty, 0), height - 1);
+        tile[ty][tx] = row_of(in, in_pitch, sy)[sx];
+    }
+    __syncthreads();
+
+    const int x = blockIdx.x * TILE + threadIdx.x;
+    const int y = blockIdx.y * TILE + threadIdx.y;
+    if (x >= width || y >= height) return;
+
+    int sum = 0;
+    for (int dy = 0; dy <= 2 * RADIUS; ++dy)
+        for (int dx = 0; dx <= 2 * RADIUS; ++dx)
+            sum += tile[threadIdx.y + dy][threadIdx.x + dx];
+
+    reinterpret_cast<unsigned char *>(out + static_cast<size_t>(y) * out_pitch)[x] =
+        static_cast<unsigned char>(sum / 9);
 }
 
-// TODO 2 (self-learning #2): apply col ^ row swizzling instead of padding to
-// remove bank conflicts (see the Visual section / swizzling.svg in the README).
+// -------------------------------------------------------------------- ldg
+// TODO 1: same kernel, but read the input through __ldg(). The pointer is
+// already marked __restrict__, which is what lets the compiler prove the data
+// is read-only for the kernel's lifetime. One line changes.
 //
-// The idea: index shared memory as tile[r][c ^ r] everywhere -- both when
-// writing into shared memory and when reading neighbors back out. XOR is
-// its own inverse, so using the same formula both times keeps the logical
-// layout correct; only the physical bank each element lands on changes.
-// No extra padding column needed, unlike tiled_filter_baseline.
-//
-// Caveat to work through: the clean permutation property of col ^ row only
-// holds when the row width is a power of two (so it lines up with the
-// 32-bank layout). TILE_DIM + 2*RADIUS here is 18, not a power of two --
-// decide whether to swizzle only the inner TILE_DIM-wide (power-of-two)
-// region, or round the shared-memory row width up to the next power of two
-// and mask the swizzled index.
-__global__ void tiled_filter_swizzled(const unsigned char *in, size_t in_step,
-                                       unsigned char *out, size_t out_step,
-                                       int width, int height)
+// Before running it, predict the result. The input is read exactly once per
+// block here, so ask yourself what __ldg() can still help with.
+__global__ void box_tiled_ldg(const unsigned char *__restrict__ in, size_t in_pitch,
+                              unsigned char *__restrict__ out, size_t out_pitch,
+                              int width, int height)
 {
-    __shared__ unsigned char tile[TILE_DIM + 2 * RADIUS][TILE_DIM + 2 * RADIUS];
-    // TODO: same load/compute as tiled_filter_baseline, but replace every
-    // tile[r][c] access with tile[r][c ^ r].
+    __shared__ unsigned char tile[HALO][HALO];
+    // TODO 1: copy box_tiled and replace the load with __ldg(...)
+    (void)tile; (void)in; (void)in_pitch; (void)out; (void)out_pitch; (void)width; (void)height;
+}
+
+// -------------------------------------------------------------- coarsened
+// TODO 2: give each thread COARSEN output pixels stacked vertically, so one
+// loaded halo row serves several outputs and the per-thread index arithmetic
+// is paid once. The block covers TILE x (TILE * COARSEN) output pixels, so the
+// shared tile grows to (TILE * COARSEN + 2 * RADIUS) rows and the grid's y
+// dimension shrinks by COARSEN.
+//
+// TODO 3: registers per thread go up and resident blocks go down. Report the
+// occupancy from cudaOccupancyMaxActiveBlocksPerMultiprocessor for COARSEN =
+// 1, 2, 4 and 8 alongside the runtime, and say where the two curves part.
+#define COARSEN 4
+__global__ void box_tiled_coarsened(const unsigned char *__restrict__ in, size_t in_pitch,
+                                    unsigned char *__restrict__ out, size_t out_pitch,
+                                    int width, int height)
+{
+    __shared__ unsigned char tile[TILE * COARSEN + 2 * RADIUS][HALO];
+    // TODO 2
+    (void)tile; (void)in; (void)in_pitch; (void)out; (void)out_pitch; (void)width; (void)height;
 }
 
 int main(int argc, char **argv)
 {
     if (argc < 2) {
-        printf("usage: %s <path-to-image>\n", argv[0]);
+        printf("usage: %s <image>\n", argv[0]);
         return 1;
     }
 
-    cv::Mat h_img = cv::imread(argv[1], cv::IMREAD_GRAYSCALE);
-    if (h_img.empty()) {
-        printf("failed to load image: %s\n", argv[1]);
-        return 1;
+    cv::Mat h_in = load_gray(argv[1]);
+    cv::Mat h_out(h_in.size(), h_in.type());
+
+    device_image_t<unsigned char> d_in(h_in.cols, h_in.rows);
+    device_image_t<unsigned char> d_out(h_in.cols, h_in.rows);
+    d_in.upload(h_in);
+
+    const dim3 block(TILE, TILE);
+    const dim3 grid(div_up(h_in.cols, TILE), div_up(h_in.rows, TILE));
+
+    // One read and one write of every pixel. This is the useful traffic, not
+    // the traffic the hardware actually moves -- TODO 5 is about the gap.
+    const double bytes = 2.0 * d_in.useful_bytes();
+
+    printf("peak bandwidth for this GPU: %.0f GB/s\n", kernel_timer_t::peak_gb_per_s());
+
+    kernel_timer_t t;
+    for (int i = 0; i < 50; ++i) {
+        t.start();
+        box_tiled<<<grid, block>>>(d_in.ptr, d_in.pitch, d_out.ptr, d_out.pitch,
+                                   h_in.cols, h_in.rows);
+        CUDA_CHECK_LAST_ERROR();
+        t.stop();
     }
-
-    cv::cuda::GpuMat d_in, d_out;
-    d_in.upload(h_img);
-    d_out.create(d_in.size(), d_in.type());
-
-    dim3 block(TILE_DIM, TILE_DIM);
-    dim3 grid(cv::cudev::divUp(d_in.cols, TILE_DIM), cv::cudev::divUp(d_in.rows, TILE_DIM));
-
-    cudaEvent_t start, stop;
-    CUDA_CHECK(cudaEventCreate(&start));
-    CUDA_CHECK(cudaEventCreate(&stop));
-
-    CUDA_CHECK(cudaEventRecord(start));
-    tiled_filter_baseline<<<grid, block>>>(d_in.ptr<unsigned char>(), d_in.step,
-                                            d_out.ptr<unsigned char>(), d_out.step,
-                                            d_in.cols, d_in.rows);
-    CUDA_CHECK_LAST_ERROR();
-    CUDA_CHECK(cudaEventRecord(stop));
-    CUDA_CHECK(cudaEventSynchronize(stop));
-    float ms_baseline = 0.0f;
-    CUDA_CHECK(cudaEventElapsedTime(&ms_baseline, start, stop));
-    printf("baseline: %.3f ms\n", ms_baseline);
-
-    CUDA_CHECK(cudaEventRecord(start));
-    tiled_filter_ldg<<<grid, block>>>(d_in.ptr<unsigned char>(), d_in.step,
-                                       d_out.ptr<unsigned char>(), d_out.step,
-                                       d_in.cols, d_in.rows);
-    CUDA_CHECK_LAST_ERROR();
-    CUDA_CHECK(cudaEventRecord(stop));
-    CUDA_CHECK(cudaEventSynchronize(stop));
-    float ms_ldg = 0.0f;
-    CUDA_CHECK(cudaEventElapsedTime(&ms_ldg, start, stop));
-    printf("__ldg:    %.3f ms\n", ms_ldg);
-
-    CUDA_CHECK(cudaEventRecord(start));
-    tiled_filter_swizzled<<<grid, block>>>(d_in.ptr<unsigned char>(), d_in.step,
-                                            d_out.ptr<unsigned char>(), d_out.step,
-                                            d_in.cols, d_in.rows);
-    CUDA_CHECK_LAST_ERROR();
-    CUDA_CHECK(cudaEventRecord(stop));
-    CUDA_CHECK(cudaEventSynchronize(stop));
-    float ms_swizzled = 0.0f;
-    CUDA_CHECK(cudaEventElapsedTime(&ms_swizzled, start, stop));
-    printf("swizzled: %.3f ms\n", ms_swizzled);
-
-    cv::Mat h_out;
+    t.report_bandwidth("Day 5 tiled", bytes);
     d_out.download(h_out);
-    cv::imshow("input", h_img);
-    cv::imshow("filtered", h_out);
-    cv::waitKey(0);
+    save_and_show("day06_baseline.png", h_out);
 
+    t.reset();
+    for (int i = 0; i < 50; ++i) {
+        t.start();
+        box_tiled_ldg<<<grid, block>>>(d_in.ptr, d_in.pitch, d_out.ptr, d_out.pitch,
+                                       h_in.cols, h_in.rows);
+        CUDA_CHECK_LAST_ERROR();
+        t.stop();
+    }
+    t.report_bandwidth("+ __ldg", bytes);
+
+    const dim3 grid_c(div_up(h_in.cols, TILE), div_up(h_in.rows, TILE * COARSEN));
+    t.reset();
+    for (int i = 0; i < 50; ++i) {
+        t.start();
+        box_tiled_coarsened<<<grid_c, block>>>(d_in.ptr, d_in.pitch, d_out.ptr, d_out.pitch,
+                                               h_in.cols, h_in.rows);
+        CUDA_CHECK_LAST_ERROR();
+        t.stop();
+    }
+    t.report_bandwidth("+ coarsened", bytes);
+    d_out.download(h_out);
+    save_and_show("day06_optimised.png", h_out);
+
+    // TODO 4: write down the three percentages. Decide, from the numbers and
+    // not from taste, whether this kernel is worth optimising further.
+    //
+    // TODO 5: run the best version under
+    //   ncu --metrics dram__bytes_read.sum,dram__bytes_write.sum ./build/day06 <image>
+    // and compare what the hardware moved with the useful bytes above. Account
+    // for the difference: sector granularity, the halo read by two blocks, the
+    // pitch padding.
     return 0;
 }

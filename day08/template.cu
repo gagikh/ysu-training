@@ -1,107 +1,106 @@
 // Day 8: Streams, Events, Asynchrony and CUDA Graphs
-// Goal: image derivative kernel on a real image (via GpuMat), timed precisely with cudaEvents.
+// Goal: process an image in row bands across several streams so that a band's
+//       transfer overlaps another band's compute, then capture the whole
+//       sequence into a graph and replay it.
 //
-// Compile:  nvcc -arch=sm_75 template.cu -o day08 `pkg-config --cflags --libs opencv4`
-// Run:      ./day08 <path-to-image>
+// Build:  cmake -B build && cmake --build build -j
+// Run:    ./build/day08 <image>
+//         nsys profile -o day08 ./build/day08 <image>
+//
+// Seven TODOs. The kernel is given: today is about what surrounds it.
 
 #include <cstdio>
-#include <cuda_runtime.h>
-#include <opencv2/opencv.hpp>
-#include <opencv2/cudaarithm.hpp>
-#include <opencv2/cudev.hpp>
+#include <vector>
 #include "../common/cuda_check.h"
+#include "../common/timer.h"
+#include "../common/image_io.h"
 
-// TODO 1: image derivative kernel (simple central difference in x and y).
-// dx[y][x] = img[y][x+1] - img[y][x-1]; dy similarly. Handle borders.
-// `img`/`dx`/`dy` are raw GpuMat pointers; index rows via their respective
-// `*_step` (bytes) -- same pitched-memory idea as Day 5.
-__global__ void image_derivative(const unsigned char *img, size_t img_step,
-                                  float *dx, float *dy, size_t grad_step,
-                                  int width, int height)
+#define BLOCK 256
+#define STREAMS 4
+
+// Given. Deliberately cheap, so the transfer is the limit and the overlap is
+// visible. Operates on a band of `rows` rows.
+__global__ void invert_band(const unsigned char *in, unsigned char *out, int count)
 {
-    // TODO
+    const int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < count) out[i] = 255 - in[i];
 }
-
-// TODO 2 (self-learning #2): shared-memory convolution — reuse the Day 5 tiled_filter pattern.
-
-// TODO 3 (self-learning #3): image transform kernel (rotate or scale).
 
 int main(int argc, char **argv)
 {
     if (argc < 2) {
-        printf("usage: %s <path-to-image>\n", argv[0]);
+        printf("usage: %s <image>\n", argv[0]);
         return 1;
     }
 
-    cv::Mat h_img = cv::imread(argv[1], cv::IMREAD_GRAYSCALE);
-    if (h_img.empty()) {
-        printf("failed to load image: %s\n", argv[1]);
-        return 1;
+    cv::Mat h_in_mat = load_gray(argv[1]);
+    const int width = h_in_mat.cols, height = h_in_mat.rows;
+    const size_t total = static_cast<size_t>(width) * height;
+
+    // TODO 1: allocate pinned host buffers for the input and the output with
+    // cudaMallocHost, and copy the image into the input buffer. Pageable
+    // memory here makes cudaMemcpyAsync synchronous, and the whole lab then
+    // shows no overlap at all -- which is worth seeing once, deliberately, in
+    // TODO 7.
+    unsigned char *h_in = nullptr, *h_out = nullptr;
+    // TODO 1
+
+    unsigned char *d_in = nullptr, *d_out = nullptr;
+    CUDA_CHECK(cudaMalloc(&d_in, total));
+    CUDA_CHECK(cudaMalloc(&d_out, total));
+
+    // TODO 2: create STREAMS streams.
+    std::vector<cudaStream_t> streams(STREAMS);
+    // TODO 2
+
+    // Bands of whole rows, so no band splits a row.
+    const int rows_per_band = div_up(height, STREAMS);
+
+    // ------------------------------------------------- the chunked pipeline
+    kernel_timer_t t;
+    for (int rep = 0; rep < 20; ++rep) {
+        t.start();
+        // TODO 3: for each band b, on stream b % STREAMS, issue in this order:
+        //   cudaMemcpyAsync host -> device for that band's bytes,
+        //   invert_band for that band's element count,
+        //   cudaMemcpyAsync device -> host for that band.
+        // Issue all of band 0's work, then all of band 1's, and so on. The
+        // streams are independent, so band 1's copy-in overlaps band 0's
+        // kernel without any explicit dependency.
+        //
+        // TODO 4: synchronise. cudaDeviceSynchronize() works but says nothing;
+        // record an event in each stream instead and wait on those, and print
+        // how far apart the four bands finished.
+        t.stop();
     }
+    t.report("pipelined, 4 streams");
 
-    cv::cuda::GpuMat d_img, d_dx, d_dy;
-    d_img.upload(h_img);
-    d_dx.create(d_img.size(), CV_32F);
-    d_dy.create(d_img.size(), CV_32F);
+    // ------------------------------------------------------- a single stream
+    // TODO 5: the same work on the default stream only, as one copy-in, one
+    // kernel, one copy-out. This is the figure the pipeline is compared
+    // against. Predict the ratio before running: what is the ceiling when
+    // transfer and compute overlap perfectly?
 
-    dim3 block(16, 16);
-    dim3 grid(cv::cudev::divUp(d_img.cols, block.x), cv::cudev::divUp(d_img.rows, block.y));
-
-    // First formal use of cudaEvent-based device-side timing.
-    cudaEvent_t start, stop;
-    CUDA_CHECK(cudaEventCreate(&start));
-    CUDA_CHECK(cudaEventCreate(&stop));
-
-    CUDA_CHECK(cudaEventRecord(start));
-    image_derivative<<<grid, block>>>(d_img.ptr<unsigned char>(), d_img.step,
-                                       d_dx.ptr<float>(), d_dy.ptr<float>(), d_dx.step,
-                                       d_img.cols, d_img.rows);
-    CUDA_CHECK_LAST_ERROR();
-    CUDA_CHECK(cudaEventRecord(stop));
-    CUDA_CHECK(cudaEventSynchronize(stop));
-
-    float ms = 0.0f;
-    CUDA_CHECK(cudaEventElapsedTime(&ms, start, stop));
-    printf("image_derivative: %.3f ms\n", ms);
-
-    CUDA_CHECK(cudaEventDestroy(start));
-    CUDA_CHECK(cudaEventDestroy(stop));
-
-    // TODO: dx/dy are raw float gradients -- cv::normalize (or take the
-    // absolute value and scale to 0-255) before cv::imshow, or they'll
-    // just look black/blown-out.
-    cv::Mat h_dx;
-    d_dx.download(h_dx);
-    cv::imshow("input", h_img);
-    cv::imshow("dx (raw float -- normalize me)", h_dx);
-    cv::waitKey(0);
-
-    // TODO (self-learning #5, stretch): create two cudaStream_t's and launch
-    // independent work (e.g. derivative + transform) on each, then check for overlap.
-
-
-    // ---------------------------------------------------------------------
-    // Part 2 (asynchrony)
+    // ---------------------------------------------------------------- graph
+    // TODO 6: capture the pipeline into a graph and replay it.
+    //   cudaStreamBeginCapture(streams[0], cudaStreamCaptureModeGlobal);
+    //   ... issue exactly what TODO 3 issues, with the other streams joined
+    //       to streams[0] through events so the capture sees one graph ...
+    //   cudaStreamEndCapture(streams[0], &graph);
+    //   cudaGraphInstantiate(&exec, graph, 0);
+    // then time cudaGraphLaunch(exec, streams[0]) in the same 20-iteration
+    // loop. The work per iteration is identical, so any difference is the
+    // launch overhead the graph removed.
     //
-    // TODO: process the image in row chunks across several streams, overlapping
-    //       cudaMemcpyAsync with kernel execution. Confirm the overlap with
-    //       events and in the Nsight Systems timeline.
-    //
-    // TODO: remove the pinned allocation from the async path and measure what
-    //       happens. Explain why cudaMemcpyAsync stops being asynchronous.
-    //
-    // TODO: raise the stream count from 2 to 4 to 8 and record where the
-    //       overlap stops improving.
-    //
-    // Part 3 (CUDA graphs)
-    //
-    // TODO: capture the chunked pipeline with cudaStreamBeginCapture /
-    //       cudaStreamEndCapture, instantiate it, and launch the graph.
-    //
-    // TODO: launch the captured graph 1000 times and compare the total against
-    //       1000 sequential launches. Find where the launch-overhead saving
-    //       starts to matter.
-    // ---------------------------------------------------------------------
+    // Expect little on four bands of a photograph. Then raise STREAMS to 32
+    // and shrink the bands, and measure again: the graph wins when the launch
+    // count per iteration is high and each launch is short.
 
+    // TODO 7: rerun the pipeline with plain malloc instead of cudaMallocHost
+    // and look at the Nsight Systems timeline. Name what changed on it, and
+    // say why the copies no longer overlap.
+
+    CUDA_CHECK(cudaFree(d_in));
+    CUDA_CHECK(cudaFree(d_out));
     return 0;
 }

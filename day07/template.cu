@@ -1,223 +1,169 @@
 // Day 7: Warp Intrinsics, Reduction and Atomics
-// Goal: warp-level sum reduction using __shfl_down_sync, then extract the
-// indices of pixels above a threshold in a real image using warp scan.
+// Goal: (a) the mean of an image by warp reduction plus one atomic per block,
+//       (b) a 256-bin histogram, twice: global atomics, then privatised.
 //
-// Compile:  nvcc -arch=sm_75 template.cu -o day07 `pkg-config --cflags --libs opencv4`
-// Run:      ./day07 <path-to-image>
+// Build:  cmake -B build && cmake --build build -j
+// Run:    ./build/day07 <image>
+//
+// Scan, stream compaction and warp-aggregated atomics are in Self-Learning,
+// not here. Eight TODOs.
 
 #include <cstdio>
-#include <cuda_runtime.h>
-#include <opencv2/opencv.hpp>
-#include <opencv2/cudaarithm.hpp>
-#include <opencv2/cudev.hpp>
 #include "../common/cuda_check.h"
+#include "../common/timer.h"
+#include "../common/image_io.h"
 
-// TODO 1: warp-level sum reduction. 5 steps, halving the offset each time,
-// after which LANE 0 holds the warp's total. (Lane 16 holds a 16-element
-// partial, not the total -- shfl_down always moves data toward lower lanes.)
-//
-// No bounds check is needed on the source lane: when lane 20 asks for lane 36,
-// the intrinsic returns lane 20's own value. Those lanes are past the useful
-// half of the reduction and their results are discarded, so it never matters.
-__device__ int warp_reduce_sum(int val)
+#define BLOCK 256
+#define WARP 32
+#define BINS 256
+
+// ============================================================ part a: mean
+// TODO 1: sum the 32 values held by one warp, leaving the total in lane 0.
+// Five __shfl_down_sync steps, offset halving from 16. The mask is
+// 0xffffffff: every lane takes part.
+__device__ __forceinline__ int warp_sum(int v)
 {
-    // TODO: for (int offset = 16; offset > 0; offset >>= 1)
-    //           val += __shfl_down_sync(0xFFFFFFFF, val, offset);
-    return val;
+    // TODO 1
+    return v;
 }
 
-__global__ void reduce_kernel(const int *in, int *out, int n)
+// TODO 2: extend that to the block with the warp-shared-warp pattern. Each
+// warp's lane 0 writes its total into a __shared__ array of BLOCK / WARP
+// entries; after a __syncthreads(), the first warp reduces those entries with
+// warp_sum again.
+//
+// TODO 3: one atomicAdd per block on the global total, from thread 0 only.
+// Note what this costs: one atomic per block rather than one per pixel, which
+// is privatisation at block scope before the term is used for histograms.
+__global__ void image_sum(const unsigned char *in, size_t pitch,
+                          int width, int height, unsigned long long *total)
 {
-    int id = blockDim.x * blockIdx.x + threadIdx.x;
+    __shared__ int warp_totals[BLOCK / WARP];
 
-    // Note the shape of this line -- it is NOT `if (id < n) { ... }`.
-    // Every lane must reach warp_reduce_sum, because the 0xFFFFFFFF mask
-    // inside it promises all 32 will. Out-of-range lanes contribute the
-    // identity for the operation instead (0 for sum). Wrapping the reduction
-    // in a bounds check is undefined behaviour, not just a wrong total.
-    int val = (id < n) ? in[id] : 0;
+    const int x = blockIdx.x * BLOCK + threadIdx.x;
+    const int y = blockIdx.y;
 
-    val = warp_reduce_sum(val);
+    int v = 0;
+    if (x < width && y < height)
+        v = (in + static_cast<size_t>(y) * pitch)[x];
 
-    // TODO: lane 0 of each warp writes its partial sum somewhere (shared mem or
-    // atomicAdd to a global accumulator).
+    // TODO 2: warp_sum, then across warps through warp_totals
+    // TODO 3: thread 0 does one atomicAdd into *total
+    (void)warp_totals; (void)v; (void)total;
 }
 
-// TODO 4 (self-learning #4): reduce a whole BLOCK, not just a warp.
-// A 256-thread block is 8 warps; warp_reduce_sum leaves you 8 partials that
-// still need combining. The idiomatic pattern is hierarchical -- reduce inside
-// each warp, park one value per warp in shared memory, then let the first warp
-// reduce those. Two levels covers the 1024-thread maximum exactly, because
-// 32 lanes collapse to 1 and at most 32 warps collapse to 1.
-//
-// Costs ONE __syncthreads() and 128 bytes of shared memory. The classic
-// shared-memory tree reduction costs 8 barriers and 8 rounds of shared traffic
-// for the same 256 threads -- time both (self-learning #4) and see.
-__device__ int block_reduce_sum(int val)
+// ======================================================= part b: histogram
+// Given: the obvious version. Every thread does one global atomic, and every
+// thread whose pixel has the same value collides with every other. On a
+// photograph the collisions are severe, because real images are far from
+// uniform.
+__global__ void histogram_global(const unsigned char *in, size_t pitch,
+                                 int width, int height, unsigned int *hist)
 {
-    __shared__ int warp_sums[32];        // 32 warps max per block
+    const int x = blockIdx.x * BLOCK + threadIdx.x;
+    const int y = blockIdx.y;
+    if (x >= width || y >= height) return;
 
-    // Valid only because blockDim.x is a multiple of 32 here. For a block like
-    // dim3(16,16) you must flatten the thread index first -- see INTRINSICS.md.
-    const int lane = threadIdx.x & 31;
-    const int wid  = threadIdx.x >> 5;
-
-    // TODO: val = warp_reduce_sum(val);
-    // TODO: if (lane == 0) warp_sums[wid] = val;
-    // TODO: __syncthreads();
-    // TODO: const int nwarps = blockDim.x >> 5;
-    //       val = (threadIdx.x < nwarps) ? warp_sums[lane] : 0;
-    //       if (wid == 0) val = warp_reduce_sum(val);
-    // returns the block total in thread 0
-    (void)lane; (void)wid;
-    return val;
+    const unsigned char v = (in + static_cast<size_t>(y) * pitch)[x];
+    atomicAdd(&hist[v], 1u);
 }
 
-// TODO 5 (self-learning #5): the butterfly variant. Identical cost, but every
-// lane ends up holding the total instead of just lane 0 -- no broadcast needed
-// afterwards. Useful when all 32 lanes need the result to continue.
-//   for (int offset = 16; offset > 0; offset >>= 1)
-//       val += __shfl_xor_sync(0xFFFFFFFF, val, offset);
-__device__ int warp_reduce_sum_all(int val)
+// TODO 4: the same histogram, privatised. Each block keeps a BINS-entry copy
+// in shared memory.
+//   - clear it cooperatively, then __syncthreads();
+//   - accumulate into the shared copy with atomicAdd on shared memory;
+//   - __syncthreads();
+//   - merge the shared copy into the global one, one atomicAdd per bin per
+//     block instead of one per pixel.
+//
+// TODO 5: shared-memory atomics still serialise on a contended bin. Say which
+// part of the cost privatisation removes and which part it does not.
+__global__ void histogram_private(const unsigned char *in, size_t pitch,
+                                  int width, int height, unsigned int *hist)
 {
-    // TODO
-    return val;
-}
-
-// TODO 2 (self-learning #2): warp-level inclusive prefix sum (scan).
-// Kogge-Stone, 5 steps like the reduction. [1,1,1,...] -> [1,2,3,...].
-//
-// The `lane >= offset` guard is load-bearing here, unlike in the reduction.
-// A lane asking for a source below 0 gets its OWN value back, and adding that
-// would silently double its contribution. In warp_reduce_sum those lanes'
-// results get discarded so the garbage never escapes; here they don't.
-__device__ int warp_scan_inclusive(int val)
-{
-    // TODO: const int lane = threadIdx.x & 31;    // only valid if blockDim.x % 32 == 0
-    //       for (int offset = 1; offset < 32; offset <<= 1) {
-    //           const int n = __shfl_up_sync(0xFFFFFFFF, val, offset);
-    //           if (lane >= offset) val += n;
-    //       }
-    return val;
-}
-
-// TODO 3 (self-learning #3, Hands-On Task): use warp_scan_inclusive to
-// compact the indices of pixels above `threshold` into `out_indices`, and
-// atomically bump `out_count` by each warp's local count. `img`/`img_step`
-// are a GpuMat's raw pointer/pitch, same as Day 5-7.
-__global__ void extract_indices_above_threshold(const unsigned char *img, size_t img_step,
-                                                  int width, int height, unsigned char threshold,
-                                                  int *out_indices, int *out_count)
-{
-    // TODO
-}
-
-// TODO 6 (self-learning #6): the same compaction, but for a BINARY predicate
-// there's a two-instruction shortcut that beats the 5-step scan entirely.
-// This is what production code does.
-//
-//   const int  lane = threadIdx.x & 31;
-//   const bool keep = (pixel > threshold);
-//
-//   const unsigned ballot = __ballot_sync(0xFFFFFFFF, keep);  // 1 bit per lane
-//   const int prefix = __popc(ballot & ((1u << lane) - 1));   // lanes before me
-//   const int total  = __popc(ballot);                        // lanes in total
-//
-//   int base;
-//   if (lane == 0) base = atomicAdd(out_count, total);        // ONE atomic per warp
-//   base = __shfl_sync(0xFFFFFFFF, base, 0);                  // broadcast it
-//
-//   if (keep) out_indices[base + prefix] = my_index;
-//
-// The mask (1u << lane) - 1 clears bit `lane` and above, giving an EXCLUSIVE
-// prefix -- your own slot shouldn't be counted before you write to it. It's
-// correct at lane 31 too: (1u << 31) - 1 == 0x7FFFFFFF.
-//
-// One atomicAdd per warp instead of one per passing pixel: up to 32x less
-// contention. Same warp-aggregation idea Day 9 generalizes as privatization.
-__global__ void extract_indices_ballot(const unsigned char *img, size_t img_step,
-                                        int width, int height, unsigned char threshold,
-                                        int *out_indices, int *out_count)
-{
-    // TODO
+    __shared__ unsigned int local[BINS];
+    // TODO 4
+    (void)local; (void)in; (void)pitch; (void)width; (void)height; (void)hist;
 }
 
 int main(int argc, char **argv)
 {
-    // --- Part 1: generic warm-up, sum of 1s should equal n ---
-    const int n = 1024;
-    int *d_in, *d_out;
-    CUDA_CHECK(cudaMalloc(&d_in, n * sizeof(int)));
-    CUDA_CHECK(cudaMalloc(&d_out, sizeof(int)));
-    CUDA_CHECK(cudaMemset(d_out, 0, sizeof(int)));
-
-    // TODO: fill d_in with test data (e.g. all 1s to verify the sum == n)
-
-    reduce_kernel<<<cv::cudev::divUp(n, 256), 256>>>(d_in, d_out, n);
-    CUDA_CHECK_LAST_ERROR();
-    CUDA_CHECK(cudaDeviceSynchronize());
-
-    int h_out = 0;
-    CUDA_CHECK(cudaMemcpy(&h_out, d_out, sizeof(int), cudaMemcpyDeviceToHost));
-    printf("sum = %d\n", h_out);
-
-    CUDA_CHECK(cudaFree(d_in));
-    CUDA_CHECK(cudaFree(d_out));
-
-    // --- Part 2: threshold + compact indices on a real image ---
     if (argc < 2) {
-        printf("(skipping Part 2: usage: %s <path-to-image>)\n", argv[0]);
-        return 0;
-    }
-
-    cv::Mat h_img = cv::imread(argv[1], cv::IMREAD_GRAYSCALE);
-    if (h_img.empty()) {
-        printf("failed to load image: %s\n", argv[1]);
+        printf("usage: %s <image>\n", argv[0]);
         return 1;
     }
 
-    cv::cuda::GpuMat d_img;
-    d_img.upload(h_img);
+    cv::Mat h_in = load_gray(argv[1]);
+    const int width = h_in.cols, height = h_in.rows;
+    const long long pixels = static_cast<long long>(width) * height;
 
-    const int max_indices = h_img.rows * h_img.cols;
-    int *d_indices, *d_count;
-    CUDA_CHECK(cudaMalloc(&d_indices, max_indices * sizeof(int)));
-    CUDA_CHECK(cudaMalloc(&d_count, sizeof(int)));
-    CUDA_CHECK(cudaMemset(d_count, 0, sizeof(int)));
+    device_image_t<unsigned char> d_in(width, height);
+    d_in.upload(h_in);
 
-    dim3 block(32, 8); // multiple of warp size on x for clean warp_scan_inclusive use
-    dim3 grid(cv::cudev::divUp(d_img.cols, block.x), cv::cudev::divUp(d_img.rows, block.y));
-    extract_indices_above_threshold<<<grid, block>>>(
-        d_img.ptr<unsigned char>(), d_img.step, d_img.cols, d_img.rows,
-        128, d_indices, d_count);
+    unsigned long long *d_total = nullptr;
+    unsigned int *d_hist = nullptr;
+    CUDA_CHECK(cudaMalloc(&d_total, sizeof(unsigned long long)));
+    CUDA_CHECK(cudaMalloc(&d_hist, BINS * sizeof(unsigned int)));
+
+    const dim3 block(BLOCK);
+    const dim3 grid(div_up(width, BLOCK), height);
+
+    // ---- mean -----------------------------------------------------------
+    CUDA_CHECK(cudaMemset(d_total, 0, sizeof(unsigned long long)));
+    image_sum<<<grid, block>>>(d_in.ptr, d_in.pitch, width, height, d_total);
     CUDA_CHECK_LAST_ERROR();
-    CUDA_CHECK(cudaDeviceSynchronize());
 
-    int h_count = 0;
-    CUDA_CHECK(cudaMemcpy(&h_count, d_count, sizeof(int), cudaMemcpyDeviceToHost));
-    printf("pixels above threshold: %d / %d\n", h_count, max_indices);
+    unsigned long long h_total = 0;
+    CUDA_CHECK(cudaMemcpy(&h_total, d_total, sizeof(h_total), cudaMemcpyDeviceToHost));
+    printf("GPU mean  %.6f\n", static_cast<double>(h_total) / pixels);
 
-    CUDA_CHECK(cudaFree(d_indices));
-    CUDA_CHECK(cudaFree(d_count));
+    // TODO 6: check it. cv::mean(h_in)[0] is the reference. They should agree
+    // exactly here, because the accumulation is in integers. Repeat the
+    // exercise with a float accumulator and explain why that one does not.
+    printf("CPU mean  %.6f\n", cv::mean(h_in)[0]);
 
+    // ---- histogram ------------------------------------------------------
+    const double bytes = static_cast<double>(d_in.useful_bytes());   // read only
 
-    // ---------------------------------------------------------------------
-    // Part 3 (from the atomics half of this session)
-    //
-    // TODO: compute the image mean with warp reduction, then atomicAdd the
-    //       per-warp partial sums into one global accumulator.
-    //
-    // TODO: pack 32 binary pixel values into one 32-bit word with
-    //       __ballot_sync, and write the inverse (unpack) operation.
-    //
-    // TODO: build a 256-bin grayscale histogram twice -- once with a global
-    //       atomicAdd per pixel, once privatised into shared memory. Time both
-    //       on a large image, then on an image that is nearly one shade, and
-    //       explain whether the gap widens or narrows.
-    //
-    // TODO: replace the shared-memory atomicAdd with atomicAdd_block and
-    //       measure whether it makes a difference.
-    // ---------------------------------------------------------------------
+    kernel_timer_t t;
+    for (int i = 0; i < 20; ++i) {
+        CUDA_CHECK(cudaMemset(d_hist, 0, BINS * sizeof(unsigned int)));
+        t.start();
+        histogram_global<<<grid, block>>>(d_in.ptr, d_in.pitch, width, height, d_hist);
+        CUDA_CHECK_LAST_ERROR();
+        t.stop();
+    }
+    t.report_bandwidth("histogram, global", bytes);
 
+    unsigned int h_ref[BINS];
+    CUDA_CHECK(cudaMemcpy(h_ref, d_hist, sizeof(h_ref), cudaMemcpyDeviceToHost));
+
+    t.reset();
+    for (int i = 0; i < 20; ++i) {
+        CUDA_CHECK(cudaMemset(d_hist, 0, BINS * sizeof(unsigned int)));
+        t.start();
+        histogram_private<<<grid, block>>>(d_in.ptr, d_in.pitch, width, height, d_hist);
+        CUDA_CHECK_LAST_ERROR();
+        t.stop();
+    }
+    t.report_bandwidth("histogram, privatised", bytes);
+
+    unsigned int h_got[BINS];
+    CUDA_CHECK(cudaMemcpy(h_got, d_hist, sizeof(h_got), cudaMemcpyDeviceToHost));
+
+    // TODO 7: the two histograms must be identical, bin for bin. Compare them
+    // and report the first mismatch rather than only a pass or fail.
+    long long checked = 0;
+    for (int b = 0; b < BINS; ++b) checked += h_got[b];
+    printf("bins sum to %lld, pixels %lld  %s\n", checked, pixels,
+           checked == pixels ? "ok" : "MISMATCH");
+
+    // TODO 8: the speedup depends on the image. Run both versions on a
+    // photograph and on a synthetic image where every pixel is the same value,
+    // and explain the difference from the contention argument, not from the
+    // code.
+
+    CUDA_CHECK(cudaFree(d_total));
+    CUDA_CHECK(cudaFree(d_hist));
     return 0;
 }

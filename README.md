@@ -65,11 +65,35 @@ day measures against those numbers rather than against adjectives. By Day 6 a ke
 expressed as a percentage of peak bandwidth; by Day 10 that same method is used to decide
 whether a student's proposed project is possible at all.
 
+## Building
+
+```
+cmake -B build
+cmake --build build -j
+./build/day01
+```
+
+CMake 3.24 or newer, since that is the first version that accepts
+`CUDA_ARCHITECTURES native`. `native` compiles for the card in the machine
+doing the build; for a different target pass
+`-DCMAKE_CUDA_ARCHITECTURES=80` instead.
+
+Days 5 to 9 read an image from disk, write the result back and display it when
+a display is available, so they need OpenCV 4 — the `core`, `imgcodecs` and
+`highgui` components only, which a distribution package provides. The
+`cv::cuda` modules are deliberately not used: device allocation, pitch and
+transfer are the subject of Days 4 to 6 and stay visible in the lab code.
+Day 9 additionally links cuBLAS and NPP, both part of the CUDA toolkit.
+
+Each `template.cu` also carries a plain `nvcc` line for building one day on
+its own.
+
 ## Before the first session
 
 - Cluster access, one pinned CUDA version and one container image for everyone.
+- OpenCV 4 and CMake 3.24+ in that image; `cmake -B build && cmake --build build` succeeds.
 - `report_device_capabilities()` runs and prints sensible numbers.
-- A smoke test: clone, `make run`, see output.
+- A test image on the cluster that every participant can read.
 
 ## Reference material
 

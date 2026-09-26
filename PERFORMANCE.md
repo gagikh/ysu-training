@@ -42,7 +42,7 @@ The same formula checks out against A100 (1935 GB/s), RTX 3090 (936), V100 (900)
 
 One caveat that changes how you read the ratio: this is a **theoretical ceiling**, what the bus would sustain if it never idled. Real kernels top out around 80–90% even when perfectly coalesced, because of DRAM refresh, row activation and read/write turnaround. So 85% of peak means you're done, not that there's 15% left on the table.
 
-**Achieved bandwidth**, which you compute from a kernel's timing (Day 6's `cudaEvent`s):
+**Achieved bandwidth**, which you compute from a kernel's timing (Day 8's `cudaEvent`s):
 
 ```
 achieved_GB_s = bytes_read_and_written / elapsed_seconds / 1e9
@@ -58,7 +58,7 @@ Divide the second by the first. That percentage is the only optimization metric 
 
 A vector add reads 2 floats and writes 1 per element — 12 bytes of traffic for one add. It will *never* be compute-bound, and no amount of loop unrolling or fast math will help it. Knowing that before you start saves a day.
 
-> **Try it now:** Day 13's `template.cu` already times three kernel variants. Add the bandwidth calculation to each `printf` and you have converted "this one is faster" into "this one hits 78% of peak, so stop."
+> **Try it now:** Day 6's `template.cu` already times three kernel variants. Add the bandwidth calculation to each `printf` and you have converted "this one is faster" into "this one hits 78% of peak, so stop."
 
 [`common/timer.h`](common/timer.h) packages all of this — `cudaEvent` timing with running avg/min/max, plus `gb_per_s()`, `tflops()` and the two peaks to divide by:
 
@@ -173,7 +173,7 @@ Notice that tiled matmul is the same arithmetic as naive matmul; tiling didn't m
 
 ## 1. Coalescing
 
-**Get this right before anything else.** *Covered on [Day 2](day02/README.md) (the pattern) and [Day 13](day06/README.md) (the measurement).*
+**Get this right before anything else.** *Covered on [Day 2](day02/README.md) (the pattern) and [Day 6](day06/README.md) (the measurement).*
 
 When a warp issues a global load, the memory system serves it in **128-byte transactions**. If the 32 lanes ask for 32 consecutive 4-byte words, those requests fall inside one transaction and the warp is served once. If they're scattered, the hardware issues a separate transaction per distinct line — up to 32 of them — fetching 128 bytes each to use 4.
 
@@ -265,19 +265,19 @@ Watch out for the non-obvious sources: an early `return` on a bounds check, a `w
 
 ## 4. Tiling and shared memory
 
-*Covered on [Day 5](day05/README.md), [Day 10](day05/README.md), [Day 12](day08/README.md) — the other strength.*
+*Covered on [Day 5](day05/README.md), [Day 5](day05/README.md), [Day 8](day08/README.md) — the other strength.*
 
 Stage a block of data in shared memory once, then read it many times from on-chip. The win is a division: if every element is reused `T` times, tiling cuts global traffic by roughly `T`.
 
 Tiled matmul is the canonical case — naive matmul reads each element of A and B N times from global; a `T×T` tiled version reads each `N/T` times. The arithmetic is identical. That's the roofline move from §0.
 
-Two follow-ons the course covers: bank conflicts ([Day 5](day05/README.md), and the configurable [bank_conflict_animations.html](day05/bank_conflict_animations.html)), and the padding vs. swizzling trade ([Day 13](day06/README.md)).
+Two follow-ons the course covers: bank conflicts ([Day 5](day05/README.md), and the configurable [bank_conflict_animations.html](day05/bank_conflict_animations.html)), and the padding vs. swizzling trade ([Day 6](day06/README.md)).
 
 ---
 
 ## 5. Privatization
 
-*See [Day 9](day07/README.md).*
+*See [Day 7](day07/README.md).*
 
 When many threads atomically update the *same* address, they serialize — atomics resolve at L2 (see [ARCHITECTURE.md](ARCHITECTURE.md)), so every SM's request to that address funnels through one L2 slice regardless of how much parallelism you have. A histogram over 256 bins with a million threads is the standard disaster.
 
@@ -310,7 +310,7 @@ The accounting is the whole story: `n` global atomics become `n` *shared* atomic
 
 **Two cheaper variants, same idea:**
 
-- **Warp-level aggregation.** Reduce within the warp first, then have lane 0 issue one atomic — 32× fewer requests. This is exactly what Day 8 and Day 9 already build with `__shfl_down_sync`; privatization is that pattern generalized past sum reduction. `__match_any_sync` ([INTRINSICS.md](INTRINSICS.md)) does it for the keyed case.
+- **Warp-level aggregation.** Reduce within the warp first, then have lane 0 issue one atomic — 32× fewer requests. This is exactly what Day 7 and Day 7 already build with `__shfl_down_sync`; privatization is that pattern generalized past sum reduction. `__match_any_sync` ([INTRINSICS.md](INTRINSICS.md)) does it for the keyed case.
 - **Block-scoped atomics.** `atomicAdd_block()` only needs coherence within the block, so it's cheaper than the device-wide version. Free win on shared-memory accumulators.
 
 **When it doesn't pay:** if contention is already low (a large output array, well-spread keys), privatization just adds a merge phase and zeroing cost. It's a fix for *contention*, so confirm you have contention before reaching for it.
@@ -319,7 +319,7 @@ The accounting is the whole story: `n` global atomics become `n` *shared* atomic
 
 ## 6. Thread coarsening
 
-*See [Day 13](day06/README.md).*
+*See [Day 6](day06/README.md).*
 
 The default instinct is one thread per output element. Sometimes that's too much parallelism: every thread re-pays a fixed cost — index arithmetic, bounds checks, the tile loads it shares with its neighbours, block launch overhead. **Coarsening** gives each thread several elements so that cost is paid once and amortized.
 
@@ -370,7 +370,7 @@ The techniques above make a given algorithm run closer to the hardware limit. Th
 - *Better asymptotics.* A work-efficient Brent-Kung scan does O(n) work where the simpler Kogge-Stone does O(n log n) — see PMPP Ch. 11.
 - *Restructure to avoid materializing anything large.* **FlashAttention** is the famous example: standard attention writes an N×N score matrix to global memory and reads it back, so it's memory-bound and O(N²) in memory. FlashAttention tiles the computation and uses an online softmax so the score matrix never exists in HBM at all. The FLOP count actually goes *up* slightly. It's several times faster, because it traded free FLOPs for expensive bytes.
 
-**Use a library.** cuBLAS, cuFFT, CUB and Thrust ([Day 14](day09/README.md)) are written by people with access to the SASS scheduler and years of tuning per architecture. If your problem is a GEMM, you will not beat cuBLAS. Reach for a library first; write a custom kernel when your problem *isn't* the library's problem — usually because fusing it with neighbouring work saves a memory round trip, which is §7 again.
+**Use a library.** cuBLAS, cuFFT, CUB and Thrust ([Day 9](day09/README.md)) are written by people with access to the SASS scheduler and years of tuning per architecture. If your problem is a GEMM, you will not beat cuBLAS. Reach for a library first; write a custom kernel when your problem *isn't* the library's problem — usually because fusing it with neighbouring work saves a memory round trip, which is §7 again.
 
 ---
 

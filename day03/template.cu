@@ -1,8 +1,10 @@
 // Day 3: SIMT Execution, Warps, Divergence and Latency Hiding
 // Goal: large vector addition with timing, then BGR->grayscale conversion.
 //
-// Compile:  nvcc -arch=sm_75 template.cu -o day03
-// Run:      ./day03
+// Build:  cmake -B build && cmake --build build -j
+// Run:    ./build/day03
+//
+// Without cmake: nvcc -arch=native template.cu -o day03
 
 #include <cstdio>
 #include <chrono>

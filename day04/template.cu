@@ -1,8 +1,11 @@
 // Day 4: Memory Types and Host-Device Transfers
 // Goal: compare pageable vs. pinned vs. unified memory for the same transfer/compute.
 //
-// Compile:  nvcc -arch=sm_75 template.cu -o day04  (profile with: nsys profile ./day04)
-// Run:      ./day04
+// Build:  cmake -B build && cmake --build build -j
+// Run:    ./build/day04
+//         nsys profile -o day04 ./build/day04
+//
+// Without cmake: nvcc -arch=native template.cu -o day04
 
 #include <cstdio>
 #include <cuda_runtime.h>

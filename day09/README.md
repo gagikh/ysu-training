@@ -34,6 +34,16 @@
 ## Precision on your hardware
 On consumer and inference-class cards fp64 runs at 1/32 to 1/64 of the fp32 rate; on datacentre cards it is closer to 1/2. Determine which case applies to the cluster GPU from the Day 1 numbers before designing any double-precision work.
 
+## Visual
+![Bit layout of fp64, fp32, tf32, bf16 and fp16, each split into sign, exponent and mantissa, drawn to scale](precision_formats.svg)
+
+The exponent field sets the range, the mantissa the precision. bf16 and tf32
+keep fp32's 8-bit exponent, so a value that fits in fp32 fits in them; fp16's
+5-bit exponent does not, which is why training in fp16 needs loss scaling and
+training in bf16 does not. tf32 is not a storage format: it exists only as a
+tensor core input, which is why cuBLAS turns it on through a math mode rather
+than through a data type.
+
 ## Resources
 - [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 7.24. Warp Matrix Functions · 8. Cooperative Groups
 - Train With Mixed Precision: https://docs.nvidia.com/deeplearning/performance/
@@ -41,7 +51,7 @@ On consumer and inference-class cards fp64 runs at 1/32 to 1/64 of the fp32 rate
 - cuBLAS, cuFFT, cuRAND: https://docs.nvidia.com/cuda/ · cuDNN: https://docs.nvidia.com/deeplearning/cudnn/
 
 ## Hands-On Task
-Replace your Day 5 filter and your matrix multiply with library calls, enable tensor cores, and compare both speed and result.
+Replace two hand-written kernels with library calls: the Day 5 and Day 6 box filter with NPP, and a matrix multiply with cuBLAS. The naive matrix multiply is given in the template, so this does not depend on Day 5's extension task. Then enable tensor cores and compare both speed and result.
 
 ## Self-Learning
 1. Use cuBLAS for a matrix multiply and compare against your own kernel, in time and in result.

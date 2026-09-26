@@ -1,111 +1,143 @@
 // Day 9: Libraries, Tensor Cores and Precision
-// Goal: estimate pi via Monte Carlo sampling using cuRAND, plus a bonus:
-// fill a real cv::cuda::GpuMat with cuRAND-generated noise.
+// Goal: replace two hand-written kernels with library calls -- a matrix
+//       multiply with cuBLAS, the Day 5 box filter with NPP -- then turn on
+//       tensor cores and measure what precision costs.
 //
-// Compile:  nvcc -arch=sm_75 template.cu -o day09 -lcurand `pkg-config --cflags --libs opencv4`
-// Run:      ./day09
+// Build:  cmake -B build && cmake --build build -j
+// Run:    ./build/day09 <image> [matrix size, default 2048]
+//
+// The naive matrix multiply is given here, so this day does not depend on
+// Day 5's extension task. Seven TODOs.
 
 #include <cstdio>
-#include <cuda_runtime.h>
-#include <curand_kernel.h>
-#include <opencv2/opencv.hpp>
-#include <opencv2/cudaarithm.hpp>
-#include <opencv2/cudev.hpp>
+#include <cmath>
+#include <vector>
+#include <cublas_v2.h>
+#include <nppi_filtering_functions.h>
 #include "../common/cuda_check.h"
+#include "../common/timer.h"
+#include "../common/image_io.h"
 
-// TODO 1: initialize one curandState per thread, seeded uniquely per thread.
-__global__ void setup_rng(curandState *states, unsigned long long seed, int n)
+#define CUBLAS_CHECK(call)                                                    \
+    do {                                                                      \
+        cublasStatus_t s__ = (call);                                          \
+        if (s__ != CUBLAS_STATUS_SUCCESS) {                                   \
+            fprintf(stderr, "cuBLAS error at %s:%d: %d\n  in call: %s\n",     \
+                    __FILE__, __LINE__, static_cast<int>(s__), #call);        \
+            exit(EXIT_FAILURE);                                               \
+        }                                                                     \
+    } while (0)
+
+#define NPP_CHECK(call)                                                       \
+    do {                                                                      \
+        NppStatus s__ = (call);                                               \
+        if (s__ != NPP_SUCCESS) {                                             \
+            fprintf(stderr, "NPP error at %s:%d: %d\n  in call: %s\n",        \
+                    __FILE__, __LINE__, static_cast<int>(s__), #call);        \
+            exit(EXIT_FAILURE);                                              \
+        }                                                                     \
+    } while (0)
+
+// Given: one output element per thread, every input read from global memory.
+// Not the tiled version -- the point is the distance between a straightforward
+// kernel and a library, not between two hand-written kernels.
+__global__ void matmul_naive(const float *A, const float *B, float *C, int n)
 {
-    int id = blockDim.x * blockIdx.x + threadIdx.x;
-    if (id >= n) return;
-    // TODO: curand_init(seed, id, 0, &states[id]);
+    const int row = blockIdx.y * blockDim.y + threadIdx.y;
+    const int col = blockIdx.x * blockDim.x + threadIdx.x;
+    if (row >= n || col >= n) return;
+
+    float acc = 0.0f;
+    for (int k = 0; k < n; ++k) acc += A[row * n + k] * B[k * n + col];
+    C[row * n + col] = acc;
 }
 
-// TODO 2: each thread samples `samples_per_thread` random (x, y) points in [0,1)^2,
-// counts how many fall inside the unit circle (x*x + y*y <= 1), and atomicAdds
-// its count into a global counter.
-__global__ void monte_carlo_pi(curandState *states, unsigned long long *inside_count,
-                                int samples_per_thread, int n)
+int main(int argc, char **argv)
 {
-    int id = blockDim.x * blockIdx.x + threadIdx.x;
-    if (id >= n) return;
+    if (argc < 2) {
+        printf("usage: %s <image> [n]\n", argv[0]);
+        return 1;
+    }
+    const int n = (argc > 2) ? atoi(argv[2]) : 2048;
 
-    // TODO: curandState local = states[id];
-    //       int local_count = 0;
-    //       for (int i = 0; i < samples_per_thread; ++i) {
-    //           float x = curand_uniform(&local);
-    //           float y = curand_uniform(&local);
-    //           if (x*x + y*y <= 1.0f) ++local_count;
-    //       }
-    //       atomicAdd(inside_count, (unsigned long long)local_count);
-}
+    // ============================================================== matmul
+    const size_t elems = static_cast<size_t>(n) * n;
+    std::vector<float> h_A(elems), h_B(elems);
+    for (size_t i = 0; i < elems; ++i) {
+        h_A[i] = static_cast<float>(drand48() - 0.5);
+        h_B[i] = static_cast<float>(drand48() - 0.5);
+    }
 
-// TODO (bonus): fill a GpuMat with random noise, one pixel per thread.
-// `states` must be sized >= width*height (reuse setup_rng() to init it).
-// `img`/`img_step` are the GpuMat's pointer/pitch, same as Day 5+.
-__global__ void fill_noise_image(curandState *states, unsigned char *img, size_t img_step,
-                                  int width, int height)
-{
-    // TODO: int x = ..., y = ...; if (x >= width || y >= height) return;
-    //       int id = y * width + x; // index into `states`, NOT into `img` (states is flat)
-    //       curandState local = states[id];
-    //       img[y * img_step + x] = curand(&local) % 256;
-}
+    float *d_A = nullptr, *d_B = nullptr, *d_C = nullptr, *d_C_ref = nullptr;
+    for (float **p : {&d_A, &d_B, &d_C, &d_C_ref})
+        CUDA_CHECK(cudaMalloc(p, elems * sizeof(float)));
+    CUDA_CHECK(cudaMemcpy(d_A, h_A.data(), elems * sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_B, h_B.data(), elems * sizeof(float), cudaMemcpyHostToDevice));
 
-int main()
-{
-    // --- Part 1: Monte Carlo pi estimation ---
-    const int n = 1 << 16;
-    const int samples_per_thread = 1000;
+    const dim3 block(16, 16);
+    const dim3 grid(div_up(n, 16), div_up(n, 16));
+    const double flops = 2.0 * n * n * n;
 
-    curandState *d_states;
-    CUDA_CHECK(cudaMalloc(&d_states, n * sizeof(curandState)));
+    kernel_timer_t t;
+    for (int i = 0; i < 5; ++i) {
+        t.start();
+        matmul_naive<<<grid, block>>>(d_A, d_B, d_C_ref, n);
+        CUDA_CHECK_LAST_ERROR();
+        t.stop();
+    }
+    t.report_tflops("matmul, hand-written", flops);
 
-    unsigned long long *d_inside_count;
-    CUDA_CHECK(cudaMalloc(&d_inside_count, sizeof(unsigned long long)));
-    CUDA_CHECK(cudaMemset(d_inside_count, 0, sizeof(unsigned long long)));
+    cublasHandle_t handle;
+    CUBLAS_CHECK(cublasCreate(&handle));
 
-    const int threads = 256;
-    const int blocks = cv::cudev::divUp(n, threads);
+    // TODO 1: the same product with cublasSgemm. cuBLAS is column-major and
+    // the arrays above are row-major, so computing B * A in cuBLAS's order
+    // gives (A * B) in ours without transposing anything. Work out the
+    // argument order rather than copying it: this is the single most common
+    // mistake when a hand-written kernel is first replaced by cuBLAS.
+    //
+    // TODO 2: check the result against d_C_ref. It will not match bit for bit.
+    // State the largest absolute difference and say which of the two is more
+    // nearly correct, and why the answer is not "the reference".
+    t.reset();
+    // TODO 1
 
-    setup_rng<<<blocks, threads>>>(d_states, 1234ULL, n);
-    CUDA_CHECK_LAST_ERROR();
-    monte_carlo_pi<<<blocks, threads>>>(d_states, d_inside_count, samples_per_thread, n);
-    CUDA_CHECK_LAST_ERROR();
-    CUDA_CHECK(cudaDeviceSynchronize());
+    // TODO 3: allow tf32 on the tensor cores with
+    //   cublasSetMathMode(handle, CUBLAS_TF32_TENSOR_OP_MATH);
+    // and time the same call again. Then compare the error against the fp32
+    // result: tf32 keeps fp32's exponent and 10 mantissa bits, so report how
+    // much accuracy the speedup cost, in the same units as TODO 2.
+    //
+    // TODO 4: on this GPU, what is fp64's rate relative to fp32? Repeat the
+    // cuBLAS call with cublasDgemm on double inputs and compare. The ratio
+    // decides whether a student's double-precision thesis project is feasible
+    // here at all, which is the question Day 10 asks.
 
-    unsigned long long h_inside_count = 0;
-    CUDA_CHECK(cudaMemcpy(&h_inside_count, d_inside_count, sizeof(unsigned long long), cudaMemcpyDeviceToHost));
+    CUBLAS_CHECK(cublasDestroy(handle));
+    for (float *p : {d_A, d_B, d_C, d_C_ref}) CUDA_CHECK(cudaFree(p));
 
-    double total_samples = (double)n * samples_per_thread;
-    double pi_estimate = 4.0 * (double)h_inside_count / total_samples;
-    printf("pi estimate: %f\n", pi_estimate);
+    // ============================================================ the filter
+    cv::Mat h_img = load_gray(argv[1]);
+    cv::Mat h_out(h_img.size(), h_img.type());
 
-    CUDA_CHECK(cudaFree(d_states));
-    CUDA_CHECK(cudaFree(d_inside_count));
+    device_image_t<unsigned char> d_img(h_img.cols, h_img.rows);
+    device_image_t<unsigned char> d_filtered(h_img.cols, h_img.rows);
+    d_img.upload(h_img);
 
-    // TODO (self-learning #2/#3): add cuBLAS matrix-vector multiply and cuFFT examples here.
+    // TODO 5: the Day 5 and Day 6 box filter as one NPP call:
+    //   nppiFilterBoxBorder_8u_C1R with a 3x3 mask, NPP_BORDER_REPLICATE.
+    // NPP takes the pitch as an int line step and the size as an NppiSize, so
+    // the parameters map directly onto what device_image_t already holds.
+    //
+    // TODO 6: compare it with your Day 6 kernel, in time and pixel for pixel.
+    // If the outputs differ, find out whether the difference is at the border
+    // or everywhere, and decide which behaviour you want.
+    //
+    // TODO 7: the honest conclusion. For this filter, does the library win?
+    // State the rule you would give a student for when a hand-written kernel
+    // is still worth writing.
 
-    // --- Part 2 (bonus): random noise image via GpuMat ---
-    const int width = 256, height = 256;
-    curandState *d_img_states;
-    CUDA_CHECK(cudaMalloc(&d_img_states, width * height * sizeof(curandState)));
-    setup_rng<<<cv::cudev::divUp(width * height, 256), 256>>>(d_img_states, 5678ULL, width * height);
-    CUDA_CHECK_LAST_ERROR();
-
-    cv::cuda::GpuMat d_noise(height, width, CV_8UC1);
-    dim3 block(16, 16);
-    dim3 grid(cv::cudev::divUp(width, block.x), cv::cudev::divUp(height, block.y));
-    fill_noise_image<<<grid, block>>>(d_img_states, d_noise.ptr<unsigned char>(), d_noise.step, width, height);
-    CUDA_CHECK_LAST_ERROR();
-    CUDA_CHECK(cudaDeviceSynchronize());
-
-    cv::Mat h_noise;
-    d_noise.download(h_noise);
-    cv::imshow("cuRAND noise", h_noise);
-    cv::waitKey(0);
-
-    CUDA_CHECK(cudaFree(d_img_states));
-
+    d_filtered.download(h_out);
+    save_and_show("day09_npp.png", h_out);
     return 0;
 }

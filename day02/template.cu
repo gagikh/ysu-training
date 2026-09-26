@@ -1,8 +1,10 @@
 // Day 2: Thread Hierarchy, Indexing and Launch Configuration
 // Goal: 1D vector addition, a grid-stride loop variant, then 2D "image addition".
 //
-// Compile:  nvcc -arch=sm_75 template.cu -o day02
-// Run:      ./day02
+// Build:  cmake -B build && cmake --build build -j
+// Run:    ./build/day02
+//
+// Without cmake: nvcc -arch=native template.cu -o day02
 
 #include <cstdio>
 #include <cuda_runtime.h>

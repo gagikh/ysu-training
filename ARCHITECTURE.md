@@ -1,6 +1,6 @@
 # GPU Architecture Deep Dive: Inside a Streaming Multiprocessor
 
-Day 1 gives you the host-vs-device mental model and the raw numbers for your own GPU via `report_device_capabilities()`. This document goes one level deeper: what's actually *inside* an SM, and how the memory spaces you've been using since Day 4 (pinned/unified), Day 5 (shared/constant/pitched), Day 11 (textures), and Day 13 (L1/L2) map onto real silicon.
+Day 1 gives you the host-vs-device mental model and the raw numbers for your own GPU via `report_device_capabilities()`. This document goes one level deeper: what's actually *inside* an SM, and how the memory spaces you've been using since Day 4 (pinned/unified), Day 5 (shared/constant/pitched) and Day 6 (L1/L2) map onto real silicon.
 
 Exact unit counts differ by architecture — this describes the general layout every NVIDIA GPU since Volta shares, not a specific chip. Where a number matters, get it from `report_device_capabilities()` for your own GPU rather than trusting a number here.
 
@@ -17,11 +17,11 @@ Exact unit counts differ by architecture — this describes the general layout e
 
 **SFU (Special Function Units).** Hardware for fast, lower-precision transcendental math — `sin`, `cos`, `exp`, reciprocal, `sqrt` approximations. What `--use_fast_math` (Day 1) routes your math through instead of the fully IEEE-754-accurate software implementations.
 
-**Tensor Cores.** Matrix-multiply-accumulate hardware, present from Volta onward (compute capability ≥ 7.0). `report_device_capabilities()` prints a count per SM, but note *how* it gets that number: NVIDIA doesn't expose tensor-core counts through `cudaDeviceProp` at all, so `device_info.h` looks the value up from a hardcoded per-generation table (8 for Volta/Turing, 4 for Ampere onward). Unlike every other figure in that report, it isn't queried from your actual GPU — it's an educated guess from the compute capability. Libraries like cuBLAS (Day 14) use these automatically for supported operations and data types.
+**Tensor Cores.** Matrix-multiply-accumulate hardware, present from Volta onward (compute capability ≥ 7.0). `report_device_capabilities()` prints a count per SM, but note *how* it gets that number: NVIDIA doesn't expose tensor-core counts through `cudaDeviceProp` at all, so `device_info.h` looks the value up from a hardcoded per-generation table (8 for Volta/Turing, 4 for Ampere onward). Unlike every other figure in that report, it isn't queried from your actual GPU — it's an educated guess from the compute capability. Libraries like cuBLAS (Day 9) use these automatically for supported operations and data types.
 
 **Warp scheduler + dispatch unit.** Each SM is split into partitions (commonly 4), each with its own warp scheduler. Every cycle, a scheduler picks one *ready* warp from among all the warps resident in its partition and issues its next instruction to the execution units — this is the hardware behind the latency-hiding story from Day 3: if warp A is stalled waiting on a memory load, the scheduler just issues from warp B instead, so the pipeline doesn't sit idle.
 
-**Load/Store (LD/ST) units.** Handle address calculation and issue for memory instructions — every `cudaMalloc`'d pointer dereference in your kernel goes through these on its way to shared memory, L1, L2, or global memory. Texture fetches (Day 11) go through a separate **texture unit** instead — see the Texture cache entry below.
+**Load/Store (LD/ST) units.** Handle address calculation and issue for memory instructions — every `cudaMalloc`'d pointer dereference in your kernel goes through these on its way to shared memory, L1, L2, or global memory. Texture fetches go through a separate **texture unit** instead — see the Texture cache entry below.
 
 ## From C/C++ to SASS: Instruction Reference
 
@@ -45,13 +45,13 @@ nvdisasm day01.cubin                                  # alternative SASS disasse
 | `a / b` | `div.rn.f32` | short instruction sequence, not one opcode | Division isn't a single hardware instruction — it's a reciprocal approximation (via the SFU) refined by a couple of Newton-Raphson steps. This is *why* division is much slower than multiply/add. |
 | `sqrtf(a)` | `sqrt.rn.f32` | `MUFU.RSQ` + refinement | Same story as division: approximate via SFU, then refined. `rsqrtf()` skips the refinement for a cheaper, less precise result. |
 | `fmodf(a, b)` | no single opcode | `FMUL`/`FFMA`/`FADD` sequence | There's no hardware "modulo" instruction; the compiler expands it into a short sequence (roughly: `a - trunc(a/b) * b`). Worth knowing before you assume it's as cheap as `+`. |
-| `__ldg(&x)` (Day 13) | `ld.global.nc.f32` | `LDG.E.CONSTANT` | The `.nc`/`CONSTANT` qualifier routes the read through the read-only data cache path — the same physical cache texture fetches use, see below. |
+| `__ldg(&x)` (Day 6) | `ld.global.nc.f32` | `LDG.E.CONSTANT` | The `.nc`/`CONSTANT` qualifier routes the read through the read-only data cache path — the same physical cache texture fetches use, see below. |
 | shared-memory read/write (Day 5) | `ld.shared` / `st.shared` | `LDS` / `STS` | Distinct opcodes from global loads/stores (`LDG`/`STG`) — the hardware genuinely treats shared memory as a separate address space. |
 | `__syncthreads()` | `bar.sync 0` | `BAR.SYNC` | A block-wide barrier instruction — every thread in the block must reach it before any can proceed past it. |
-| `__shfl_down_sync(...)` (Day 8) | `shfl.sync.down.b32` | `SHFL.DOWN` | Register-to-register exchange within a warp, no memory traffic at all. |
-| `atomicAdd(...)` (Day 9) | `atom.global.add.u32` | `ATOM(G).ADD` / `RED.ADD` | Resolved at L2, not the issuing SM — see the L2 section below. |
-| `tex2D(...)` (Day 11) | `tex.2d.v4.f32.f32` | `TEX` | Goes through the dedicated texture unit, not `LDG` — see Texture cache below. |
-| `__popc(x)` (Day 10) | `popc.b32` | `POPC` | Population count (number of set bits) in one instruction — what makes Hamming distance cheap. |
+| `__shfl_down_sync(...)` (Day 7) | `shfl.sync.down.b32` | `SHFL.DOWN` | Register-to-register exchange within a warp, no memory traffic at all. |
+| `atomicAdd(...)` (Day 7) | `atom.global.add.u32` | `ATOM(G).ADD` / `RED.ADD` | Resolved at L2, not the issuing SM — see the L2 section below. |
+| `tex2D(...)` (texture objects, not covered in this course) | `tex.2d.v4.f32.f32` | `TEX` | Goes through the dedicated texture unit, not `LDG` — see Texture cache below. |
+| `__popc(x)` (Day 5) | `popc.b32` | `POPC` | Population count (number of set bits) in one instruction — what makes Hamming distance cheap. |
 
 **How to actually reach for a specific instruction from C/C++:**
 
@@ -80,7 +80,7 @@ Every cache described in this document — L1, L2, texture, constant — is fini
 
 You can influence this beyond hoping the LRU approximation guesses right, at two different granularities:
 
-**Region-level: `cudaAccessPolicyWindow` (Day 13).** Marks a whole address range as `cudaAccessPropertyPersisting` (bias the policy to *keep* it, resist eviction) or `cudaAccessPropertyStreaming` (bias it to *evict first*). The tool for "this buffer gets read every iteration of my loop — don't let a one-off read evict it."
+**Region-level: `cudaAccessPolicyWindow` (Day 6).** Marks a whole address range as `cudaAccessPropertyPersisting` (bias the policy to *keep* it, resist eviction) or `cudaAccessPropertyStreaming` (bias it to *evict first*). The tool for "this buffer gets read every iteration of my loop — don't let a one-off read evict it."
 
 **Instruction-level: load/store cache operators.** Every individual global load or store can carry its own cache hint, exposed as intrinsics — finer-grained than a whole-buffer policy window, down to a single access:
 
@@ -93,12 +93,12 @@ You can influence this beyond hoping the LRU approximation guesses right, at two
 | `__ldcv(ptr)` | `ld.global.cv` | Treated as **volatile** — bypasses/invalidates any cached copy and re-reads from memory every single time, never trusting what's in L1/L2. | Correctness, not performance: another agent (the host, another stream, another GPU) may have written this address since you last read it — e.g. polling a flag the CPU sets while your kernel is running. |
 | `__stwb(ptr, val)` | `st.global.wb` | **Write-back** (default): the value lands in cache, and only gets flushed out to global memory later, when the line is evicted. Repeated writes to the same address before eviction can be absorbed without each one hitting memory. | Ordinary output you might read back later in the same kernel, or that benefits from write-coalescing. |
 | `__stcg(ptr, val)` | `st.global.cg` | Write **bypasses L1, lands in L2 only** — mirrors `__ldcg` for stores. | Writing intermediate results you won't re-read yourself, but that another block might soon — avoid burning your own SM's L1 space on it. |
-| `__stcs(ptr, val)` | `st.global.cs` | Cached but flagged **evict-first**, same idea as `__ldcs` applied to a store. | Final output written once, never read back inside the kernel — the Day 13 `tiled_filter` output pixel is the textbook example. |
+| `__stcs(ptr, val)` | `st.global.cs` | Cached but flagged **evict-first**, same idea as `__ldcs` applied to a store. | Final output written once, never read back inside the kernel — the Day 6 `tiled_filter` output pixel is the textbook example. |
 | `__stwt(ptr, val)` | `st.global.wt` | **Write-through**: sent straight to memory (via L2) immediately, instead of sitting dirty in a write-back cache line. | You need the write visible to other kernels/streams/the host as soon as possible, or want to avoid holding a dirty line at all — trades away write-coalescing for earlier visibility. |
 
-This is a *different* mechanism from `__ldg()`: `__ldg` changes **which cache** a read goes through (the read-only/texture cache instead of the normal L1/L2 path — see Day 11 and the Texture cache entry below). The operators above stay on the normal L1/L2 path and instead change **how long the replacement policy tries to keep the line around**. They're complementary, not alternatives — you could `__ldg()` a read-only buffer *and* mark it streaming if you know each element is touched exactly once.
+This is a *different* mechanism from `__ldg()`: `__ldg` changes **which cache** a read goes through (the read-only/texture cache instead of the normal L1/L2 path — see the Texture cache entry below). The operators above stay on the normal L1/L2 path and instead change **how long the replacement policy tries to keep the line around**. They're complementary, not alternatives — you could `__ldg()` a read-only buffer *and* mark it streaming if you know each element is touched exactly once.
 
-A practical pattern from this week's material: in a kernel like Day 13's `tiled_filter`, the halo region around each tile is read repeatedly by neighboring threads (a good candidate to leave at the default `__ldca` — or route through `__ldg`/texture, Day 11), while the final filtered output is written exactly once per pixel and never read back inside the same kernel — a natural candidate for `__stcs` so it doesn't linger in L1 competing with data that's actually reused.
+A practical pattern from this week's material: in a kernel like Day 6's `tiled_filter`, the halo region around each tile is read repeatedly by neighboring threads (a good candidate to leave at the default `__ldca` — or route through `__ldg` or a texture object), while the final filtered output is written exactly once per pixel and never read back inside the same kernel — a natural candidate for `__stcs` so it doesn't linger in L1 competing with data that's actually reused.
 
 ## Memory Organization
 
@@ -108,9 +108,9 @@ A practical pattern from this week's material: in a kernel like Day 13's `tiled_
 
 **Kernel parameters live in constant memory.** This one surprises people: the arguments you pass to a `__global__` function (`my_kernel<<<grid,block>>>(a, b, n)`) aren't passed on a stack or in registers the way a normal C++ function call works — the driver copies them into a reserved region of constant memory before the kernel launches, and every thread reads them from there. This is exactly the constant-cache broadcast case above: every thread in a warp reading the same kernel parameter is effectively free.
 
-**Texture cache.** A third small, read-only, per-SM cache, distinct from both L1 and constant cache — this is what Day 11's `tex2D` fetches actually hit. On Kepler and newer, it's unified with the same "read-only data cache" path that `__ldg()` uses (see the instruction table above), so a plain `__ldg()`'d pointer and an actual bound texture object can end up sharing the same physical cache. What earns it a separate name from L1: it's tuned for **2D/3D spatial locality** rather than linear coalescing. A fetch at `(x, y)` and a nearby fetch at `(x+1, y+1)` hit this cache well even though those two addresses aren't contiguous in linear memory — exactly the access pattern Day 11's zoom/rotate kernels have, and precisely what a cache built for coalesced linear access (L1) doesn't handle as gracefully. The **texture unit** sitting in front of this cache is also where the bilinear filtering and address-mode (clamp/wrap/mirror) hardware from Day 11 physically lives — the cache alone doesn't interpolate anything; the unit does that on the way out.
+**Texture cache.** A third small, read-only, per-SM cache, distinct from both L1 and constant cache — this is what `tex2D` fetches actually hit. On Kepler and newer, it's unified with the same "read-only data cache" path that `__ldg()` uses (see the instruction table above), so a plain `__ldg()`'d pointer and an actual bound texture object can end up sharing the same physical cache. What earns it a separate name from L1: it's tuned for **2D/3D spatial locality** rather than linear coalescing. A fetch at `(x, y)` and a nearby fetch at `(x+1, y+1)` hit this cache well even though those two addresses aren't contiguous in linear memory — exactly the access pattern a zoom or rotate kernel has, and precisely what a cache built for coalesced linear access (L1) doesn't handle as gracefully. The **texture unit** sitting in front of this cache is also where the bilinear filtering and address-mode (clamp/wrap/mirror) hardware physically lives — the cache alone doesn't interpolate anything; the unit does that on the way out.
 
-**L2 cache & atomics.** Unlike shared memory/L1/constant/texture caches, L2 is a single cache shared by *every* SM on the chip, sitting between all the SMs and global memory (`l2CacheSize` in `report_device_capabilities()`; `persistingL2CacheMaxSize` is the portion you can pin with the `cudaAccessPolicyWindow` hints from Day 13, and it uses the same approximate-LRU replacement policy — biased by that policy window — as L1). L2 also contains dedicated ALUs for atomic read-modify-write operations — when you call `atomicAdd` (Day 9), the operation is actually resolved at L2, not bounced back to the issuing SM's own ALUs. That's *why* heavy atomic contention on a single address is slow: every SM's atomic requests to that address funnel through the same L2 slice and serialize there, regardless of how many SMs are trying.
+**L2 cache & atomics.** Unlike shared memory/L1/constant/texture caches, L2 is a single cache shared by *every* SM on the chip, sitting between all the SMs and global memory (`l2CacheSize` in `report_device_capabilities()`; `persistingL2CacheMaxSize` is the portion you can pin with the `cudaAccessPolicyWindow` hints from Day 6, and it uses the same approximate-LRU replacement policy — biased by that policy window — as L1). L2 also contains dedicated ALUs for atomic read-modify-write operations — when you call `atomicAdd` (Day 7), the operation is actually resolved at L2, not bounced back to the issuing SM's own ALUs. That's *why* heavy atomic contention on a single address is slow: every SM's atomic requests to that address funnel through the same L2 slice and serialize there, regardless of how many SMs are trying.
 
 **Global memory (VRAM).** Off-chip DRAM, the largest and slowest space, visible to every SM through L2. Everything you `cudaMalloc` lives here. This is the "Device" memory in Day 1's host/device picture.
 
@@ -123,13 +123,13 @@ A practical pattern from this week's material: in a kernel like Day 13's `tiled_
 | Field | What it tells you |
 |---|---|
 | `regsPerMultiprocessor` / `regsPerBlock` | Register file size — the budget behind register spilling and occupancy |
-| `sharedMemPerBlock` / max shared mem per SM | Shared memory / L1 budget (Day 5, Day 13) |
+| `sharedMemPerBlock` / max shared mem per SM | Shared memory / L1 budget (Day 5, Day 6) |
 | `totalConstMem` | Constant memory size (and indirectly, headroom for kernel parameters) |
-| `l2CacheSize` / `persistingL2CacheMaxSize` | L2 cache size and how much of it you can pin (Day 13) |
+| `l2CacheSize` / `persistingL2CacheMaxSize` | L2 cache size and how much of it you can pin (Day 6) |
 | `warpSize` | Threads per warp — almost always 32, never hardcode it anyway |
 | `maxThreadsPerMultiProcessor` | Ceiling on resident warps per SM — the other half of the occupancy equation |
 | `singleToDoublePrecisionPerfRatio` | How many FP32 units exist per FP64 unit |
-| tensor cores per SM † | Whether/how much cuBLAS-style matrix hardware you have (Day 14) |
+| tensor cores per SM † | Whether/how much cuBLAS-style matrix hardware you have (Day 9) |
 | `memoryClockRate` / `memoryBusWidth` ‡ | Theoretical global-memory bandwidth — the ceiling nothing beats |
 
 † Not a `cudaDeviceProp` field. `device_info.h` derives this from a hardcoded compute-capability table, unlike every other row here, which is queried from the driver.
@@ -142,6 +142,6 @@ Texture cache size specifically isn't exposed through `cudaDeviceProp` the way t
 - **Day 1** — `report_device_capabilities()` surfaces the raw numbers this document explains; `--keep` and `-Xptxas -v` are how you inspect the PTX/SASS discussed above.
 - **Day 3** — warp scheduling and the instruction pipeline (fetch from I-cache, dispatch to a partition) are the *behavior*; this document is the *hardware* behind it.
 - **Day 4** — pinned/unified memory is about the host↔device link; this document is what's on the far side of that link, inside the device.
-- **Day 5, Day 13** — shared memory, bank conflicts, `__ldg`, LRU/cache-operator hints, and L2 persistence hints are all techniques for working *with* the memory organization described here, not around it.
-- **Day 8, Day 9, Day 10** — `__shfl_*`, `__ballot_sync`, `__popc`, and `atomicAdd` are all single instructions once you get past the intrinsic wrapper — the instruction table above shows what they actually compile to.
-- **Day 11** — texture sampling and bilinear filtering are backed by the texture cache and texture unit described above, not by L1.
+- **Day 5, Day 6** — shared memory, bank conflicts, `__ldg`, LRU/cache-operator hints, and L2 persistence hints are all techniques for working *with* the memory organization described here, not around it.
+- **Day 7, Day 7, Day 5** — `__shfl_*`, `__ballot_sync`, `__popc`, and `atomicAdd` are all single instructions once you get past the intrinsic wrapper — the instruction table above shows what they actually compile to.
+- **Texture objects** (not covered in this course) — texture sampling and bilinear filtering are backed by the texture cache and texture unit described above, not by L1.
