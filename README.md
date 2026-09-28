@@ -67,40 +67,19 @@ whether a student's proposed project is possible at all.
 
 ## Building and running
 
-On the cluster, from the repository root: compile on the login node, run on a
-GPU node through SLURM.
-
 ```
-bash compile.sh day01
-sbatch submit.sh build/day01
+./compile.sh day01/template.cu
+sbatch submit.sh template
+sbatch submit.sh template image.png    # days 5-9
 ```
 
-The output lands in `logs/report_<job id>.log`. Days 5 to 9 take an image:
-
-```
-bash compile.sh day05
-sbatch submit.sh build/day05 <image>
-```
-
-`compile.sh` targets `sm_90`, the cluster's H100, with CUDA 12.8.
-
-Days 5 to 9 read an image from disk, write the result back and display it when
-a display is available, so they need OpenCV 4 — the `core`, `imgcodecs` and
-`highgui` components only, which a distribution package provides. The
-`cv::cuda` modules are deliberately not used: device allocation, pitch and
-transfer are the subject of Days 4 to 6 and stay visible in the lab code.
-Day 9 additionally links cuBLAS and NPP, both part of the CUDA toolkit.
-
-The headers in `common/` read clock rates through `cudaDeviceGetAttribute`
-rather than the `cudaDeviceProp` fields. The fields are deprecated in CUDA 12
-and removed in CUDA 13, so this keeps the course compiling after the cluster
-is upgraded.
+The output is in `logs/`. Target: H100 (`sm_90`), CUDA 12.8. Days 5 to 9 need OpenCV 4.
 
 ## Before the first session
 
 - Cluster access, one CUDA version and one environment for everyone.
 - OpenCV 4 on the login node: `pkg-config --modversion opencv4` prints a version.
-- `bash compile.sh day01 && sbatch submit.sh build/day01` produces a log with sensible numbers.
+- `./compile.sh day01/template.cu && sbatch submit.sh template` produces a log with sensible numbers.
 - A test image on the cluster that every participant can read.
 
 ## Reference material

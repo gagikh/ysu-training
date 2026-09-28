@@ -3,9 +3,9 @@
 //       transfer overlaps another band's compute, then capture the whole
 //       sequence into a graph and replay it.
 //
-// Build:  bash compile.sh day08        (login node, repository root)
-// Run:    sbatch submit.sh build/day08 <image>
-//         under Nsight Systems, on a GPU node: nsys profile -o logs/day08 ./build/day08 <image>
+// Build:  ./compile.sh day08/template.cu      (login node, repository root)
+// Run:    sbatch submit.sh template <image>
+//         under Nsight Systems, on a GPU node: nsys profile -o logs/day08 ./template <image>
 //
 // Seven TODOs. The kernel is given: today is about what surrounds it.
 

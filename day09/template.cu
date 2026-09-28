@@ -3,8 +3,8 @@
 //       multiply with cuBLAS, the Day 5 box filter with NPP -- then turn on
 //       tensor cores and measure what precision costs.
 //
-// Build:  bash compile.sh day09        (login node, repository root)
-// Run:    sbatch submit.sh build/day09 <image> [matrix size, default 2048]
+// Build:  ./compile.sh day09/template.cu      (login node, repository root)
+// Run:    sbatch submit.sh template <image> [matrix size, default 2048]
 //
 // The naive matrix multiply is given here, so this day does not depend on
 // Day 5's extension task. Seven TODOs.

@@ -1,8 +1,8 @@
 // Day 6: Coalescing, Caches and Bandwidth
 // Goal: take Day 5's tiled filter to a stated percentage of peak bandwidth.
 //
-// Build:  bash compile.sh day06        (login node, repository root)
-// Run:    sbatch submit.sh build/day06 <image>
+// Build:  ./compile.sh day06/template.cu      (login node, repository root)
+// Run:    sbatch submit.sh template <image>
 //
 // Day 5's working tiled filter is given below, so the whole session is spent
 // on the optimisations and on the measurement. Five TODOs, three of them one
@@ -154,7 +154,7 @@ int main(int argc, char **argv)
     // not from taste, whether this kernel is worth optimising further.
     //
     // TODO 5: run the best version under
-    //   ncu --metrics dram__bytes_read.sum,dram__bytes_write.sum ./build/day06 <image>
+    //   ncu --metrics dram__bytes_read.sum,dram__bytes_write.sum ./template <image>
     // and compare what the hardware moved with the useful bytes above. Account
     // for the difference: sector granularity, the halo read by two blocks, the
     // pitch padding.

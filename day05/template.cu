@@ -2,8 +2,8 @@
 // Goal: a tiled 3x3 box filter with a halo, then a Sobel magnitude, both
 //       reading the image once into shared memory per block.
 //
-// Build:  bash compile.sh day05        (login node, repository root)
-// Run:    sbatch submit.sh build/day05 <image>
+// Build:  ./compile.sh day05/template.cu      (login node, repository root)
+// Run:    sbatch submit.sh template <image>
 //
 // Time: five TODOs. TODO 1 and 2 are the lab; 3 is the same structure again
 // and should be quick once 1 and 2 work; 4 and 5 are measurements, not code.

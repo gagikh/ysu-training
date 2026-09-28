@@ -81,14 +81,14 @@ my_kernel                   0.412 ms     763.1 GB/s  (76% of 1008 GB/s peak)
 
 The arithmetic above tells you *whether* a kernel is slow. When you need to know *why*, there are two tools, and picking the wrong one wastes an afternoon:
 
-- **`nsys` (Nsight Systems) — timeline, whole application.** Answers "where does wall-clock time actually go?" Use it when the GPU looks idle, when you suspect transfers dominate compute (Days 4 and 8), or when you want to confirm streams are genuinely overlapping rather than serializing. `nsys profile -o report ./build/day08`, then open `report.nsys-rep` in the GUI. The give-away pattern is a timeline with gaps between kernels: your bottleneck is host-side or a missing async copy, and no amount of kernel tuning will help.
-- **`ncu` (Nsight Compute) — one kernel, in depth.** Answers "why is *this* kernel slow?" Use it once `nsys` has told you which kernel matters. `ncu --set full -o report ./build/day06` is thorough and slow; targeted metrics are faster:
+- **`nsys` (Nsight Systems) — timeline, whole application.** Answers "where does wall-clock time actually go?" Use it when the GPU looks idle, when you suspect transfers dominate compute (Days 4 and 8), or when you want to confirm streams are genuinely overlapping rather than serializing. `nsys profile -o report ./template`, then open `report.nsys-rep` in the GUI. The give-away pattern is a timeline with gaps between kernels: your bottleneck is host-side or a missing async copy, and no amount of kernel tuning will help.
+- **`ncu` (Nsight Compute) — one kernel, in depth.** Answers "why is *this* kernel slow?" Use it once `nsys` has told you which kernel matters. `ncu --set full -o report ./template` is thorough and slow; targeted metrics are faster:
 
 ```bash
 ncu --metrics gpu__time_duration.sum,\
 dram__bytes.sum.per_second,\
 sm__throughput.avg.pct_of_peak_sustained_elapsed,\
-gpu__dram_throughput.avg.pct_of_peak_sustained_elapsed ./build/day06
+gpu__dram_throughput.avg.pct_of_peak_sustained_elapsed ./template
 ```
 
 Those last two are the whole memory-bound-vs-compute-bound question in two numbers: whichever percentage is higher is your bottleneck, and if neither is above ~60% you're latency-bound (not enough work in flight — look at occupancy, §2). Two more worth knowing:

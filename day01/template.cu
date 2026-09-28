@@ -1,8 +1,8 @@
 // Day 1: CUDA Programming Model and GPU Architecture
 // Goal: compile, launch, and run a minimal kernel; inspect thread/block identity.
 //
-// Build:  bash compile.sh day01        (login node, repository root)
-// Run:    sbatch submit.sh build/day01
+// Build:  ./compile.sh day01/template.cu      (login node, repository root)
+// Run:    sbatch submit.sh template
 
 #include <cstdio>
 #include <chrono>

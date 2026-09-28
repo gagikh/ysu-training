@@ -1,8 +1,8 @@
 // Day 2: Thread Hierarchy, Indexing and Launch Configuration
 // Goal: 1D vector addition, a grid-stride loop variant, then 2D "image addition".
 //
-// Build:  bash compile.sh day02        (login node, repository root)
-// Run:    sbatch submit.sh build/day02
+// Build:  ./compile.sh day02/template.cu      (login node, repository root)
+// Run:    sbatch submit.sh template
 
 #include <cstdio>
 #include <cuda_runtime.h>

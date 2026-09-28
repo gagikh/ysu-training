@@ -1,8 +1,8 @@
 // Day 3: SIMT Execution, Warps, Divergence and Latency Hiding
 // Goal: large vector addition with timing, then BGR->grayscale conversion.
 //
-// Build:  bash compile.sh day03        (login node, repository root)
-// Run:    sbatch submit.sh build/day03
+// Build:  ./compile.sh day03/template.cu      (login node, repository root)
+// Run:    sbatch submit.sh template
 
 #include <cstdio>
 #include <chrono>

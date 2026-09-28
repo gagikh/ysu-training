@@ -1,8 +1,8 @@
-# build output
-build/
+# the program compile.sh builds in the repository root
+/template
 
 # job logs; the directory itself is kept by logs/.gitkeep
 logs/*.log
 
-# images the day programs write into the directory they run from
+# images the programs write into the directory they run from
 /day0*_*.png
