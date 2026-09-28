@@ -1,218 +1,218 @@
-# Glossary
+# Տերմինների ցանկ
 
-Terms used across this course, alphabetically. Each entry notes the day it is introduced, `(Day N)`; that day's `Definitions` section holds the same text, and its `Visual` section the diagram where there is one. For the device-side functions rather than the concepts, see [INTRINSICS.md](INTRINSICS.md).
+Դասընթացում օգտագործվող տերմինները՝ այբբենական կարգով։ Ամեն տերմինի կողքին նշված է այն օրը, որտեղ ներմուծվում է՝ `(Օր N)`։ Նույն տեքստը կա այդ օրվա Սահմանումներ բաժնում, իսկ գծապատկերը, եթե կա, նրա Պատկեր բաժնում։ Device-ի ֆունկցիաների համար, ոչ թե հասկացությունների, տես [INTRINSICS.md](INTRINSICS.md)։
 
-**Achieved bandwidth** — Bytes a kernel actually moves divided by its runtime, normally expressed as a percentage of theoretical peak. *(Day 6)*
+**`__activemask`** — Վերադարձնում է այն lane-երը, որոնք այս հրամանին միասին են հասել։ Ցույց է տալիս, թե ինչպես է պատահաբար ստացվել, և չի փոխարինում այն mask-ին, որ կոդն ինքը պետք է որոշի։ *(Օր 7)*
 
-**`__activemask`** — Returns which lanes are converged at this instruction. It reports what happens to be true, and is not a substitute for a mask the code determines itself. *(Day 7)*
+**Arithmetic intensity** — Կատարված FLOP-երը մեկ բայթ հիշողության տրաֆիկի հաշվով։ Որոշում է, թե roofline-ի որ կողմում է kernel-ը. ցածր ինտենսիվությունը նշանակում է memory-bound, ինչը kernel-ների մեծ մասն է, իսկ բարձրը՝ compute-bound։ Tiling-ը բարձրացնում է այն՝ առանց թվաբանությունը փոխելու։ *(Օր 6)*
 
-**Arithmetic intensity** — FLOPs performed per byte of memory traffic. Decides which side of the roofline a kernel sits on: low intensity means memory-bound, which covers most kernels, high means compute-bound. Tiling raises it without changing the arithmetic. *(Day 6)*
+**Atomic գործողություն** — Կարդալ-փոխել-գրել մեկ հասցեի վրա, որի մեջ ոչ մի այլ thread չի կարող միջամտել՝ `atomicAdd`, `atomicCAS`, `atomicMax` և մյուսները։ *(Օր 7)*
 
-**Atomic contention** — Several threads targeting the same address. The updates serialise at L2, so the cost grows with the number of colliding threads, not with the number of atomic instructions. *(Day 7)*
+**Atomic-ների մրցակցություն (contention)** — Մի քանի thread դիմում է նույն հասցեին։ Թարմացումները սերիականացվում են L2-ում, ուստի գինն աճում է բախվող thread-երի քանակով, ոչ թե atomic հրամանների քանակով։ *(Օր 7)*
 
-**Atomic operation** — A read-modify-write on one address that no other thread can interleave with: `atomicAdd`, `atomicCAS`, `atomicMax` and the rest. *(Day 7)*
+**Atomic-ներով կուտակման ոչ դետերմինիզմ** — Atomic-ները չեն ամրագրում արժեքների միավորման հերթականությունը, իսկ լողացող կետով գումարումը ասոցիատիվ չէ։ Ուստի `atomicAdd`-ով float-եր կուտակող kernel-ը կարող է գործարկումից գործարկում տարբեր արդյունք տալ։ Վերարտադրելիության պնդումը պահանջում է reduction-ի ֆիքսված հերթականություն։ *(Օր 9)*
 
-**`__ballot_sync`** — Returns a 32-bit mask with bit N set if lane N's predicate was true, delivered to every participating lane. *(Day 7)*
+**`__ballot_sync`** — Վերադարձնում է 32-բիթանոց mask, որում N-րդ բիթը դրված է, եթե N-րդ lane-ի պայմանը ճիշտ էր։ Արդյունքը ստանում են բոլոր մասնակից lane-երը։ *(Օր 7)*
 
-**Bank** — One of the 32 equal divisions of shared memory. Successive 32-bit words fall in successive banks, and each bank serves one word per cycle. *(Day 5)*
+**Bank** — Shared memory-ի 32 հավասար բաժանումներից մեկը։ Հաջորդական 32-բիթանոց բառերն ընկնում են հաջորդական bank-երում, և ամեն bank մեկ ցիկլում սպասարկում է մեկ բառ։ *(Օր 5)*
 
-**Bank conflict** — When several threads of a warp access shared memory addresses mapping to the same bank in one transaction, those accesses are serialised instead of served in parallel. Fixed by padding (this day) or by index swizzling (Day 6). *(Day 5)*
+**Bank conflict** — Երբ warp-ի մի քանի thread մեկ transaction-ում դիմում են shared memory-ի հասցեների, որոնք նույն bank-ին են համապատասխանում, այդ դիմումները սերիականացվում են՝ զուգահեռ սպասարկվելու փոխարեն։ Լուծվում է padding-ով (այս օրը) կամ ինդեքսի swizzling-ով (Օր 6)։ *(Օր 5)*
 
-**Barrier** — A point all participating threads must reach before any may continue. `__syncthreads()` is the block-wide barrier, `__syncwarp` the warp-wide one. *(Day 5)*
+**Barrier** — Կետ, որին բոլոր մասնակից thread-երը պետք է հասնեն, մինչև որևէ մեկը շարունակի։ `__syncthreads()`-ը block-ի barrier-ն է, `__syncwarp`-ը՝ warp-ինը։ *(Օր 5)*
 
-**Block** — A group of threads, up to `maxThreadsPerBlock`, that execute on the same SM and can cooperate through shared memory and `__syncthreads()`. A kernel launch creates a grid of blocks. *(Day 2)*
+**Block** — Thread-երի խումբ, մինչև `maxThreadsPerBlock`, որոնք կատարվում են նույն SM-ի վրա և կարող են համագործակցել shared memory-ով ու `__syncthreads()`-ով։ Kernel-ի launch-ը ստեղծում է block-երի grid։ *(Օր 2)*
 
-**`blockIdx`, `threadIdx`, `blockDim`, `gridDim`** — Built-in variables, available in device code without being declared or passed: the block's index in the grid, the thread's index in the block, the block's dimensions, the grid's dimensions. They are read-only, of type `uint3` (`dim3` for the dimensions), and each thread sees its own values. *(Day 2)*
+**`blockIdx`, `threadIdx`, `blockDim`, `gridDim`** — Ներկառուցված (built-in) փոփոխականներ, հասանելի device-ի կոդում առանց հայտարարելու կամ փոխանցելու՝ block-ի index-ը grid-ում, thread-ի index-ը block-ում, block-ի չափերը, grid-ի չափերը։ Միայն-կարդալու են, `uint3` տիպի (չափերը՝ `dim3`), և ամեն thread տեսնում է իր սեփական արժեքները։ *(Օր 2)*
 
-**Broadcast** — When every lane of a warp reads the same shared memory word, the hardware serves them in one transaction. This is not a conflict. *(Day 5)*
+**Broadcast** — Երբ warp-ի բոլոր lane-երը կարդում են shared memory-ի նույն բառը, hardware-ը դրանք սպասարկում է մեկ transaction-ով։ Սա conflict չէ։ *(Օր 5)*
 
-**Cache line** — The 128-byte unit of L1 allocation. *(Day 6)*
+**Cache line** — L1-ի հատկացման 128-բայթանոց միավորը։ *(Օր 6)*
 
-**Cache operator** — A per-instruction hint about how a load or store should use the caches: `__ldg` for the read-only path, `__ldcs` for a streaming load that is evicted first, `__stcs` for a streaming store, `__ldlu` for a last-use load whose line is then discarded. *(Day 6)*
+**Cache operator** — Ամեն հրամանի ակնարկ այն մասին, թե load-ը կամ store-ը ինչպես օգտագործի cache-երը՝ `__ldg`՝ միայն-կարդալու ուղի, `__ldcs`՝ streaming load, որն առաջինն է դուրս մղվում, `__stcs`՝ streaming store, `__ldlu`՝ վերջին օգտագործման load, որից հետո տողը դեն է նետվում։ *(Օր 6)*
 
-**Coalescing (memory coalescing)** — When the 32 lanes of a warp access consecutive addresses, the hardware serves them in a single 128-byte transaction instead of up to 32 separate ones. The property belongs to the warp, not the thread: what matters is the combined footprint of one instruction across all 32 lanes, not the pattern one thread traces over time. *(Day 2)*
+**Coalescing (memory coalescing)** — Երբ warp-ի 32 lane-երը դիմում են հաջորդական հասցեների, hardware-ը դրանք սպասարկում է մեկ 128-բայթանոց transaction-ով՝ մինչև 32 առանձինի փոխարեն։ Հատկությունը warp-ինն է, ոչ թե thread-ինը. կարևորը մեկ հրամանի ընդհանուր հետքն է 32 lane-երի վրայով, ոչ թե այն, թե մեկ thread-ը ժամանակի ընթացքում ինչ ճանապարհ է անցնում։ *(Օր 2)*
 
-**Compute-bound and memory-bound** — Whether a kernel's ceiling is instruction throughput or memory bandwidth. Determines which optimisations can possibly help. *(Day 6)*
+**Compute capability** — Տարբերակի համար, օրինակ `8.6`, որը նշում է GPU-ի architecture-ի սերունդը և հնարավորությունների հավաքածուն։ nvcc-ի flag-երում գրվում է `sm_XX` և `compute_XX` ձևով։ *(Օր 1)*
 
-**Compute capability** — A version number, for example `8.6`, identifying a GPU's architecture generation and feature set. Written as `sm_XX` and `compute_XX` in nvcc flags. *(Day 1)*
+**Compute-bound և memory-bound** — Արդյոք kernel-ի առաստաղը հրամանների throughput-ն է, թե հիշողության bandwidth-ը։ Որոշում է, թե որ օպտիմալացումներն են ընդհանրապես կարող օգնել։ *(Օր 6)*
 
-**Constant memory** — A 64 KB read-only region declared `__constant__`, cached per SM. When all lanes of a warp read the same address it is served as one broadcast; divergent addresses are serialised. *(Day 5)*
+**Constant memory** — 64 ԿԲ միայն-կարդալու տիրույթ, հայտարարվում է `__constant__`-ով, cache-վում է ամեն SM-ում։ Երբ warp-ի բոլոր lane-երը կարդում են նույն հասցեն, սպասարկվում է որպես մեկ broadcast, իսկ տարբեր հասցեները սերիականացվում են։ *(Օր 5)*
 
-**Cooperative groups** — An API that makes the group a piece of code synchronises over explicit — the block, the currently converged lanes, the whole grid — instead of implicit in `__syncthreads()`. *(Day 7)*
+**Cooperative groups** — API, որը բացահայտ է դարձնում, թե կոդն ինչ խմբի վրա է սինխրոնանում՝ block, այս պահին միասին գտնվող lane-եր, ամբողջ grid։ `__syncthreads()`-ում այդ խումբը թաքնված է։ *(Օր 7)*
 
-**cuBLAS, cuFFT, cuRAND, cuDNN, NPP, nvJPEG, CUB, Thrust** — NVIDIA's libraries: dense linear algebra; fast Fourier transforms; random number generation; deep learning primitives; image and signal processing; JPEG decode and encode; block- and device-level parallel primitives; and an STL-like algorithms layer built on CUB. *(Day 9)*
+**cuBLAS, cuFFT, cuRAND, cuDNN, NPP, nvJPEG, CUB, Thrust** — NVIDIA-ի գրադարանները՝ խիտ գծային հանրահաշիվ, արագ Ֆուրիեի ձևափոխություն, պատահական թվերի գեներացում, deep learning-ի պրիմիտիվներ, պատկերի և ազդանշանի մշակում, JPEG-ի վերծանում և կոդավորում, block-ի և device-ի մակարդակի զուգահեռ պրիմիտիվներ, և STL-ի նման ալգորիթմների շերտ՝ CUB-ի վրա։ *(Օր 9)*
 
-**`cudaGetDeviceProperties`** — The API call returning a `cudaDeviceProp` structure with the device's SM count, warp size, per-SM register and shared memory limits, clock rates, memory bus width and compute capability. `report_device_capabilities()` in `common/device_info.h` prints it. *(Day 1)*
+**CUDA graph** — Գործողությունների՝ kernel-ների, պատճենումների, host callback-ների, և դրանց կախվածությունների գրանցված ուղղորդված ացիկլիկ գրաֆ, որը գործարկվում է որպես մեկ միավոր։ *(Օր 8)*
 
-**CUDA graph** — A recorded directed acyclic graph of operations — kernels, copies, host callbacks — together with their dependencies, launched as one unit. *(Day 8)*
+**`cudaGetDeviceProperties`** — API-ի կանչ, որը վերադարձնում է `cudaDeviceProp` կառուցվածք՝ device-ի SM-ների քանակով, warp size-ով, մեկ SM-ի ռեգիստրների և shared memory-ի սահմաններով, clock-երով, հիշողության bus width-ով և compute capability-ով։ `common/device_info.h`-ի `report_device_capabilities()`-ը տպում է այն։ *(Օր 1)*
 
-**`cudaHostRegister`** — Page-locks memory that was allocated normally, giving it the transfer properties of pinned memory without reallocating it. `cudaHostUnregister` reverses this. *(Day 4)*
+**`cudaHostRegister`** — Page-lock է անում սովորական ձևով հատկացված հիշողությունը՝ տալով նրան pinned հիշողության փոխանցման հատկությունները, առանց վերահատկացնելու։ `cudaHostUnregister`-ը հետ է շրջում այս ամենը։ *(Օր 4)*
 
-**`cudaMemcpyAsync`** — A copy issued into a stream, returning immediately. It is genuinely asynchronous only when the host memory is page-locked; with pageable memory the runtime falls back to a synchronous copy and does not report it. *(Day 8)*
+**`cudaMemcpyAsync`** — Stream-ի մեջ ուղարկված պատճենում, որը վերադառնում է անմիջապես։ Իսկապես ասինխրոն է միայն այն դեպքում, երբ host-ի հիշողությունը page-locked է։ Pageable հիշողության դեպքում runtime-ը անցնում է սինխրոն պատճենման և այդ մասին չի հայտնում։ *(Օր 8)*
 
-**`cudaOccupancyMaxActiveBlocksPerMultiprocessor`** — The runtime call returning how many blocks of a given kernel and block size will be resident per SM, without running the kernel. *(Day 2)*
+**`cudaOccupancyMaxActiveBlocksPerMultiprocessor`** — Runtime-ի կանչ, որը վերադարձնում է, թե տվյալ kernel-ի և block size-ի դեպքում քանի block կլինի resident մեկ SM-ում՝ առանց kernel-ը գործարկելու։ *(Օր 2)*
 
-**Default stream (per-thread)** — The stream used when none is named. Compiled with `--default-stream per-thread`, each host thread gets its own default stream, which does not serialise against other streams. *(Day 8)*
+**Default stream (per-thread)** — Այն stream-ը, որն օգտագործվում է, երբ ոչ մեկը նշված չէ։ `--default-stream per-thread`-ով կոմպիլացնելիս host-ի ամեն thread ստանում է իր սեփական default stream-ը, որը մյուս stream-երի հետ չի սերիականացվում։ *(Օր 8)*
 
-**Device** — The GPU, as opposed to the **host** (CPU). Has its own memory space (VRAM), reached over PCIe or NVLink. *(Day 1)*
+**Device** — GPU-ն, ի տարբերություն **host**-ի (CPU)։ Ունի իր հիշողությունը՝ VRAM, որին հասնում են PCIe-ով կամ NVLink-ով։ *(Օր 1)*
 
-**Device-side timing** — Measuring with events rather than a host clock, so the interval measured is the GPU's and excludes host-side launch latency. *(Day 8)*
+**Device-ի կողմից ժամանակաչափում** — Չափել event-ներով, ոչ թե host-ի ժամացույցով, որպեսզի չափված միջակայքը GPU-ինը լինի և չներառի host-ի կողմից launch-ի ուշացումը։ *(Օր 8)*
 
-**Divergence (warp divergence)** — When threads within one warp take different paths through a branch. Because the 32 threads share one instruction stream, the hardware runs each path separately with some lanes masked off, instead of in parallel. *(Day 3)*
+**Divergence (warp divergence)** — Երբ մեկ warp-ի thread-երը branch-ում տարբեր ճանապարհներ են ընտրում։ Քանի որ 32 thread-ը կիսում են հրամանների մեկ հոսք, hardware-ը ամեն ճանապարհ առանձին է անցնում՝ մի մասի lane-երը փակելով, զուգահեռ կատարելու փոխարեն։ *(Օր 3)*
 
-**DMA (Direct Memory Access)** — A transfer carried out by a copy engine without the CPU moving the data. It requires the host pages to be page-locked, which is why pinned transfers are faster. *(Day 4)*
+**DMA (Direct Memory Access)** — Փոխանցում, որը կատարում է copy engine-ը՝ առանց CPU-ի տվյալները շարժելու։ Պահանջում է, որ host-ի էջերը page-locked լինեն, և հենց դրա համար են pinned փոխանցումներն ավելի արագ։ *(Օր 4)*
 
-**Double buffering** — Splitting the input into chunks and using two or more sets of buffers and streams, so that while chunk n is computed, chunk n+1 is copied in and chunk n-1 copied out. The ceiling becomes the larger of the transfer and compute rates rather than their sum. *(Day 8)*
+**Double buffering** — Մուտքը բաժանել մասերի և օգտագործել բուֆերների ու stream-երի երկու կամ ավելի հավաքածու, որպեսզի n-րդ մասը հաշվելու ընթացքում n+1-րդը պատճենվի device, իսկ n-1-րդը՝ հետ։ Առաստաղը դառնում է փոխանցման և հաշվարկի արագություններից մեծագույնը, ոչ թե դրանց գումարը։ *(Օր 8)*
 
-**Eligible, active and stalled warp** — An active, that is resident, warp occupies a warp slot on the SM. It is eligible when nothing holds back its next instruction: the values that instruction reads are already in registers, meaning any earlier load it depends on has returned, and the unit that will execute it — the FP32 pipe, the load/store unit, a tensor core — is free this cycle. Otherwise the warp is stalled. Each cycle the scheduler picks one warp to issue from, and only eligible warps are candidates. *(Day 3)*
+**Eligible, active և stalled warp** — Active, այսինքն՝ resident warp-ը զբաղեցնում է SM-ի warp slot։ Այն **eligible** է՝ պատրաստ, երբ կարող է ուղարկել հաջորդ հրամանը։ Դրա համար երեք պայման է պետք․ հրամանն արդեն վերծանված է, նրա կարդացած բոլոր արժեքները հասանելի են, այսինքն՝ նախորդ load-ը, որից այն կախված է, վերադարձել է, և այն կատարող սարքը՝ FP32 pipe-ը, load/store unit-ը կամ tensor core-ը, այդ ցիկլում ազատ է։ Հակառակ դեպքում warp-ը stalled է։ Ամեն ցիկլ scheduler-ը ընտրում է մեկ warp, որից ուղարկի, և թեկնածու են միայն պատրաստ warp-երը։ *(Օր 3)*
 
-**Event** — A marker placed in a stream with `cudaEventRecord`, which completes when all work preceding it in that stream completes. Used to wait, `cudaEventSynchronize`, and to measure, `cudaEventElapsedTime`. *(Day 8)*
+**Event** — `cudaEventRecord`-ով stream-ում դրված նշան, որն ավարտվում է, երբ այդ stream-ում իրենից առաջ եղած ամբողջ աշխատանքն ավարտվում է։ Օգտագործվում է սպասելու համար՝ `cudaEventSynchronize`, և չափելու համար՝ `cudaEventElapsedTime`։ *(Օր 8)*
 
-**Fat binary** — The single executable nvcc produces, holding host machine code together with one or more device images (PTX, SASS, or both). At launch the driver picks a matching SASS image, or JIT-compiles the embedded PTX if none matches. *(Day 1)*
+**Fat binary** — nvcc-ի արտադրած միակ գործարկվող ֆայլը, որում host-ի մեքենայական կոդի կողքին կա device-ի մեկ կամ մի քանի պատկեր՝ PTX, SASS կամ երկուսը։ Գործարկման պահին driver-ը վերցնում է համապատասխան SASS-ը, իսկ եթե այդպիսին չկա, JIT-ով կոմպիլացնում է ներդրված PTX-ը։ *(Օր 1)*
 
-**FMA (fused multiply-add)** — `a * b + c` computed with a single rounding instead of two. One reason a GPU result and a CPU result can differ in the last bits for identical inputs in identical order. *(Day 9)*
+**FMA (fused multiply-add)** — `a * b + c`-ն հաշվված մեկ կլորացմամբ՝ երկուսի փոխարեն։ Սա պատճառներից մեկն է, որ նույն մուտքերի և նույն հերթականության դեպքում GPU-ի և CPU-ի արդյունքները կարող են տարբերվել վերջին բիթերում։ *(Օր 9)*
 
-**fp64, fp32, tf32, bf16, fp16** — Floating-point formats, given as exponent and mantissa bits. fp64: 11 and 52. fp32: 8 and 23. tf32: 8 and 10, a tensor core input format only. bf16: 8 and 7, the same range as fp32 with less precision. fp16: 5 and 10, narrower range and precision. *(Day 9)*
+**fp64, fp32, tf32, bf16, fp16** — Լողացող կետով ձևաչափեր՝ տրված էքսպոնենտի և մանտիսի բիթերով։ fp64՝ 11 և 52։ fp32՝ 8 և 23։ tf32՝ 8 և 10, միայն tensor core-ի մուտքի ձևաչափ։ bf16՝ 8 և 7, նույն տիրույթը, ինչ fp32-ը, ավելի ցածր ճշգրտությամբ։ fp16՝ 5 և 10, ավելի նեղ տիրույթ և ճշգրտություն։ *(Օր 9)*
 
-**Graph capture** — Recording a sequence of stream operations into a graph instead of executing it, between `cudaStreamBeginCapture` and `cudaStreamEndCapture`. *(Day 8)*
+**Graph capture** — Stream-ի գործողությունների հաջորդականությունը կատարելու փոխարեն գրանցել graph-ի մեջ՝ `cudaStreamBeginCapture`-ի և `cudaStreamEndCapture`-ի միջև։ *(Օր 8)*
 
-**Grid** — The full set of blocks launched by one kernel call, `<<<grid, block>>>`. *(Day 2)*
+**Grid** — Մեկ kernel-ի կանչով գործարկված block-երի ամբողջությունը՝ `<<<grid, block>>>`։ *(Օր 2)*
 
-**Grid-stride loop** — A launch pattern where a fixed number of threads each process several elements in a loop, striding by the total thread count, instead of sizing the grid to match the data. Correct for any input size without recomputing launch dimensions. *(Day 2)*
+**Grid-stride loop** — Գործարկման ձև, որտեղ ֆիքսված քանակով thread-երից ամեն մեկը ցիկլով մշակում է մի քանի տարր՝ քայլելով thread-երի ընդհանուր քանակով, grid-ը տվյալների չափին հարմարեցնելու փոխարեն։ Ճիշտ է մուտքի ցանկացած չափի համար՝ առանց launch-ի չափերը վերահաշվելու։ *(Օր 2)*
 
-**Grid-wide synchronisation** — A barrier across every block of a grid, available through cooperative groups, and only for kernels launched with `cudaLaunchCooperativeKernel` and sized so that all blocks are resident at once. *(Day 9)*
+**Halo** — Եզրային տարրերը, որոնք tile-ին պետք են, բայց իրենը չեն. R շառավղով ֆիլտրի դեպքում՝ tile-ի շուրջ R տող և սյուն։ Դրանք պետք է tile-ի հետ միասին բեռնվեն shared memory։ *(Օր 5)*
 
-**Halo** — The border elements a tile needs but does not own: for a filter of radius R, the R rows and columns around the tile. They must be loaded into shared memory along with the tile. *(Day 5)*
+**Host** — CPU-ն, ի տարբերություն **device**-ի (GPU)։ *(Օր 1)*
 
-**Host** — The CPU, as opposed to the **device** (GPU). *(Day 1)*
+**Inclusive և exclusive scan** — Նախածանցային գումարներ (prefix sums)։ Inclusive scan-ի i-րդ տարրը 0-ից i տարրերի համակցությունն է, exclusive scan-ինը՝ 0-ից i-1։ *(Օր 7)*
 
-**Inclusive and exclusive scan** — Prefix sums. Element i of an inclusive scan is the combination of elements 0 to i; of an exclusive scan, elements 0 to i-1. *(Day 7)*
+**Instantiation** — Գրանցված graph-ը դարձնել գործարկվող graph՝ `cudaGraphInstantiate`-ով։ Արվում է մեկ անգամ. launch-երի ստուգման և նախապատրաստման աշխատանքը վճարվում է այստեղ, ոչ թե ամեն գործարկման ժամանակ։ *(Օր 8)*
 
-**Instantiation** — Turning a captured graph into an executable graph with `cudaGraphInstantiate`. Done once; the work of validating and preparing the launches is paid here instead of at every launch. *(Day 8)*
+**Kernel** — `__global__` նշված ֆունկցիա, որը host-ի կոդից գործարկվում է `<<<grid, block>>>` գրելաձևով և device-ի վրա կատարվում է շատ thread-երով զուգահեռ։ *(Օր 1)*
 
-**Instruction pipeline** — The stages an instruction passes through: fetch, decode, register read, execute, memory, writeback. Several instructions are in flight at once, one per stage. *(Day 3)*
+**Kogge-Stone** — Warp-ի ներսում օգտագործվող scan-ի ձևը. k-րդ քայլում ամեն lane իրեն գումարում է իրենից k դիրքով ցածր lane-ի արժեքը, և k-ն ամեն քայլ կրկնապատկվում է։ 32 lane-անոց warp-ի համար հինգ քայլ է։ *(Օր 7)*
 
-**Kernel** — A function marked `__global__`, launched from host code with `<<<grid, block>>>` syntax, executed by many threads in parallel on the device. *(Day 1)*
+**L1** — Ամեն SM-ի cache, ֆիզիկապես նույն SRAM-ը, ինչ shared memory-ն, և երկուսի միջև բաժանումը կարգավորելի է։ *(Օր 6)*
 
-**Kogge-Stone** — The scan formulation used inside a warp: at step k every lane adds the value from the lane k positions below it, with k doubling each step. Five steps for a 32-lane warp. *(Day 7)*
+**L2** — Ամբողջ չիպի cache՝ device-ի հիշողության առջև, ընդհանուր բոլոր SM-երի համար։ Atomic-ները կատարվում են այստեղ։ *(Օր 6)*
 
-**L1** — Per-SM cache, physically the same SRAM as shared memory, with a configurable split between the two. *(Day 6)*
+**Lane** — Thread-ի դիրքը իր warp-ում՝ 0-ից 31։ *(Օր 7)*
 
-**L2** — Chip-wide cache in front of device memory, shared by every SM. Atomics are executed here. *(Day 6)*
+**Lane mask** — Ամեն `_sync` intrinsic-ի առաջին՝ 32-բիթանոց արգումենտը, մեկ բիթ ամեն lane-ի համար։ Նշում է այն lane-երը, որոնք պետք է մասնակցեն։ `0xffffffff`-ը նշանակում է ամբողջ warp-ը։ *(Օր 7)*
 
-**Lane** — A thread's position within its warp, 0 to 31. *(Day 7)*
+**Latency hiding** — GPU-ի արագագործության ռազմավարությունը. երբ warp-ը կանգ է առնում, warp scheduler-ը նույն ցիկլում ուղարկում է այլ, պատրաստ warp-ի հրամանը՝ pipeline-ը պարապ թողնելու փոխարեն։ Հենց դրա համար GPU-ն նախընտրում է շատ thread, ոչ թե քիչ ու արագ։ *(Օր 3)*
 
-**Lane mask** — The 32-bit first argument of every `_sync` intrinsic, one bit per lane, naming the lanes that must take part. `0xffffffff` means the whole warp. *(Day 7)*
+**Launch configuration** — Kernel-ի կանչի արգումենտները՝ grid-ի չափերը block-երով և block-ի չափերը thread-երով, ամեն մեկը մինչև երեքչափանի, գումարած ոչ պարտադիր dynamic shared memory-ի չափը և stream-ը։ *(Օր 2)*
 
-**Latency hiding** — The GPU's performance strategy: when one warp stalls, the warp scheduler issues an instruction from a different, ready warp in the same cycle instead of leaving the pipeline idle. The reason GPUs favour many threads over few fast ones. *(Day 3)*
+**Launch overhead** — Մեկ kernel-ի launch ուղարկելու ծախսը host-ի կողմից։ Հենց սա է graph-ը վերացնում, և դա կարևոր է, երբ կարճ kernel-ների ֆիքսված հաջորդականությունը շատ անգամ է կատարվում։ *(Օր 8)*
 
-**Launch configuration** — The arguments of a kernel call: grid dimensions in blocks and block dimensions in threads, each up to three-dimensional, plus optional dynamic shared memory size and stream. *(Day 2)*
+**Load/store unit** — SM-ի միավորներ, որոնք թողարկում են հիշողության հրամանները և հաշվում հասցեները global, local և shared memory-ի համար։ *(Օր 1)*
 
-**Launch overhead** — The host-side cost of issuing one kernel launch. It is what graphs remove, and it matters when a fixed sequence of short kernels runs many times. *(Day 8)*
+**Loop unrolling** — Ցիկլը փոխարինել իր մարմնի կրկնվող պատճեններով, ինչը հեռացնում է branch-ի ու ինդեքսի հրամանները և scheduler-ին բացում անկախ գործողություններ։ Կառավարվում է `#pragma unroll`-ով։ *(Օր 3)*
 
-**Load/store unit** — The SM units that issue memory instructions and compute addresses for global, local and shared memory accesses. *(Day 1)*
+**LRU** — Least recently used, դուրս մղման այն հերթականությունը, որին cache-երը մոտենում են։ *(Օր 6)*
 
-**Loop unrolling** — Replacing a loop by repeated copies of its body, which removes branch and index instructions and exposes independent operations to the scheduler. `#pragma unroll` controls it. *(Day 3)*
+**Mapped (zero-copy) հիշողություն** — Page-locked host հիշողություն, որն ունի նաև device-ի հասցե՝ `cudaHostAlloc`-ից `cudaHostAllocMapped`-ով։ Kernel-ը կարդում և գրում է այն ուղիղ, կապի վրայով, առանց բացահայտ պատճենի՝ ամեն դիմումին վճարելով կապի latency-ն։ *(Օր 4)*
 
-**LRU** — Least recently used, the eviction order the caches approximate. *(Day 6)*
+**MMA (matrix multiply-accumulate)** — Tensor core-ի գործողությունը՝ `D = A * B + C` փոքր մատրիցային հատվածների վրա, որ ուղարկվում է մեկ հրամանով ամեն warp-ի համար։ Հատվածների չափերը և հավասարեցումը ֆիքսված են hardware-ում, և հենց դրա համար չափերը պետք է հատվածի չափի բազմապատիկ լինեն։ *(Օր 9)*
 
-**Mapped (zero-copy) memory** — Page-locked host memory that also has a device address, from `cudaHostAlloc` with `cudaHostAllocMapped`. A kernel reads and writes it directly across the link with no explicit copy, paying link latency on every access. *(Day 4)*
+**N-way conflict** — Երբ warp-ի N lane դիմում են նույն bank-ի տարբեր բառերի, դիմումը բաժանվում է N transaction-ի։ *(Օր 5)*
 
-**Memory bandwidth** — Bytes per second between the SMs and device memory. Theoretical peak is bus width times memory clock times transfers per clock; the achieved figure is what a kernel actually reaches. *(Day 4)*
+**nvcc** — CUDA-ի կոմպիլյատորի driver-ը։ `.cu` ֆայլը բաժանում է host-ի և device-ի կոդի, device-ի մասն ինքն է կոմպիլացնում, host-ի մասը տալիս է համակարգի կոմպիլյատորին, և երկուսը միացնում մեկ binary-ի մեջ։ *(Օր 1)*
 
-**Mixed precision** — Computing in a narrow format while accumulating in a wider one, typically fp16 or bf16 inputs with fp32 accumulation. This is what tensor cores do natively. *(Day 9)*
+**NVLink** — NVIDIA-ի ուղիղ GPU-GPU կապը, որոշ համակարգերում նաև CPU-GPU, PCIe-ից մի քանի անգամ մեծ bandwidth-ով։ *(Օր 4)*
 
-**MMA (matrix multiply-accumulate)** — The tensor core operation `D = A * B + C` on small matrix fragments, issued as one instruction per warp. Fragment shapes and alignment are fixed by the hardware, which is why dimensions have to be multiples of the fragment size to use it. *(Day 9)*
+**Occupancy** — Քանի warp է միաժամանակ resident մեկ SM-ի վրա՝ հարաբերած այն առավելագույնին, որ SM-ը կարող է պահել։ Սահմանափակում է այն ռեսուրսը, որն առաջինն է սպառվում՝ ռեգիստրներ մեկ thread-ում, shared memory մեկ block-ում, կամ thread-երի քանակի սահմանը։ Սա միջոց է **latency hiding**-ի համար, ոչ թե նպատակ. մոտավորապես 50 տոկոսից հետո շահույթը հարթվում է, իսկ thread coarsening-ը դիտմամբ իջեցնում է occupancy-ն՝ մեկ thread-ին ավելի շատ աշխատանք տալու դիմաց (Օր 6)։ *(Օր 2)*
 
-**Non-determinism of atomic accumulation** — Atomics do not fix the order in which values are combined, and floating-point addition is not associative, so a kernel accumulating floats with `atomicAdd` can give different results run to run. A reproducibility claim requires a fixed reduction order. *(Day 9)*
+**Page migration** — Unified հիշողության էջի տեղափոխումն այն պրոցեսորին, որը դրա վրա fault է տվել։ Երկու ուղղությամբ կրկնվող տեղափոխումը unified հիշողության դանդաղության սովորական պատճառն է. կառավարվում է `cudaMemPrefetchAsync`-ով և `cudaMemAdvise`-ով։ *(Օր 4)*
 
-**nvcc** — The CUDA compiler driver. It separates a `.cu` file into host and device code, compiles the device part itself, passes the host part to the system compiler, and links both into one binary. *(Day 1)*
+**Page-locked հիշողություն** — Host-ի հիշողություն, որի էջերը օպերացիոն համակարգը իրավունք չունի տեղափոխել կամ swap անել։ *(Օր 4)*
 
-**NVLink** — NVIDIA's direct GPU-to-GPU link, and on some systems CPU-to-GPU, with several times the bandwidth of PCIe. *(Day 4)*
+**Pageable հիշողություն** — Սովորական host հիշողություն՝ `malloc`-ից կամ `new`-ից։ Օպերացիոն համակարգը կարող է տեղափոխել կամ swap անել դրա էջերը, ուստի GPU-ն ուղիղ չի կարող դիմել. փոխանցումը նախ պատճենում է այն driver-ի պահած page-locked միջանկյալ բուֆեր։ *(Օր 4)*
 
-**N-way conflict** — When N lanes of a warp address different words in the same bank, the access is split into N transactions. *(Day 5)*
+**PCIe** — Host-ը և device-ը միացնող bus-ը համակարգերի մեծ մասում։ Նրա bandwidth-ը մեկ կարգով ցածր է device-ի հիշողության bandwidth-ից։ *(Օր 4)*
 
-**Occupancy** — How many warps are resident on an SM at once relative to the maximum it could hold. Limited by whichever resource runs out first: registers per thread, shared memory per block, or the thread-count cap. It is a means to **latency hiding**, not a goal — returns flatten past roughly 50 percent, and coarsened kernels trade it away deliberately. *(Day 2)*
+**Pinned հիշողություն** — `cudaMallocHost`-ով հատկացված page-locked host հիշողություն, որպեսզի GPU-ն այն փոխանցի DMA-ով՝ առանց միջանկյալ պատճենի։ Պարտադիր է, որպեսզի `cudaMemcpyAsync`-ը իրոք ասինխրոն լինի։ *(Օր 4)*
 
-**Pageable memory** — Ordinary host memory from `malloc` or `new`. The operating system may move or swap its pages, so the GPU cannot access it directly: a transfer first copies it into a page-locked staging buffer held by the driver. *(Day 4)*
+**Pitch** — 2D հատկացման տողերի միջև իրական բայթային քայլը (`cudaMallocPitch`), սովորաբար `width * elementSize`-ից մեծ՝ հավասարեցման լրացման պատճառով։ Pitched հիշողությանը դիմող kernel-ները տողերը պետք է ինդեքսավորեն pitch-ով, ոչ թե width-ով։ *(Օր 5)*
 
-**Page-locked memory** — Host memory whose pages the operating system may not move or swap out. *(Day 4)*
+**`__popc`** — Հաշվում է 32-բիթանոց արժեքի մեկ դրված բիթերը։ Ballot-ի արդյունքի վրա կիրառելիս հաշվում է պայմանին բավարարող lane-երը։ *(Օր 7)*
 
-**Page migration** — The movement of a unified-memory page to the processor that faulted on it. Repeated migration in both directions is the usual reason unified memory is slow; `cudaMemPrefetchAsync` and `cudaMemAdvise` control it. *(Day 4)*
+**Privatisation** — Ամեն block-ին կամ ամեն warp-ին տալ մրցակցային կուտակիչի սեփական պատճենը, թարմացնել այն տեղում և վերջում մեկ անգամ միավորել։ Յուրաքանչյուր մուտքային տարրի համար մեկ global atomic-ը դառնում է մի քանի atomic ամբողջ block-ի համար։ Atomic-ների մրցակցության ստանդարտ լուծումն է։ *(Օր 7)*
 
-**PCIe** — The bus connecting host and device on most systems. Its bandwidth is an order of magnitude below device memory bandwidth. *(Day 4)*
+**PTX** — NVIDIA-ի virtual GPU assembly-ն, որը համատեղելի է հետագա architecture-ների հետ։ nvcc-ն device-ի կոդը նախ PTX է դարձնում, ապա `ptxas`-ը PTX-ից հավաքում է կոնկրետ architecture-ի իրական մեքենայական կոդը՝ **SASS**։ *(Օր 1)*
 
-**Pinned memory** — Page-locked host memory allocated with `cudaMallocHost`, so the GPU can transfer it by DMA with no staging copy. Required for `cudaMemcpyAsync` to be genuinely asynchronous. *(Day 4)*
+**Reconvergence** — Divergent branch-ից հետո այն կետը, որտեղ warp-ի բոլոր lane-երը նորից նույն հրամանն են կատարում։ Volta-ից սկսած lane-երն ունեն անկախ program counter, և branch-ի վերջում reconvergence-ը երաշխավորված չէ. `__syncwarp`-ը այն դարձնում է բացահայտ։ *(Օր 3)*
 
-**Pitch** — The actual byte stride between rows of a 2D allocation (`cudaMallocPitch`), normally larger than `width * elementSize` because of alignment padding. Kernels touching pitched memory must index rows by pitch, not by width. *(Day 5)*
+**Reduction** — N արժեքը մեկ արժեքի միավորել ասոցիատիվ գործողությամբ։ GPU-ի վրա արվում է ծառի տեսքով՝ warp-ի ներսում shuffle-ներով, warp-երի միջև shared memory-ով, ապա կրկին մեկ warp-ով։ *(Օր 7)*
 
-**`__popc`** — Counts the set bits of a 32-bit value. Applied to a ballot result it counts the lanes that satisfied the predicate. *(Day 7)*
+**Register file** — Մեկ SM-ի պահոց, որից հատկացվում են բոլոր thread-երի ռեգիստրները։ Չափը ֆիքսված է, ուստի մեկ thread-ի ռեգիստրները և resident warp-երի քանակը մրցում են միմյանց հետ։ *(Օր 3)*
 
-**Privatisation** — Giving each block, or each warp, a private copy of a contended accumulator, updating that copy locally, and merging once at the end. Turns one global atomic per input element into a few per block. The standard fix for atomic contention. *(Day 7)*
+**Resident block-եր** — Մեկ SM-ին միաժամանակ վերագրված block-երը։ Քանակը երեք սահմանափակումից ամենափոքրն է՝ block-երի hardware-ային սահմանը մեկ SM-ում, մեկ SM-ի ռեգիստրները բաժանած block-ի ռեգիստրների պահանջի վրա, և մեկ SM-ի shared memory-ն բաժանած block-ի shared memory-ի պահանջի վրա։ *(Օր 2)*
 
-**PTX** — NVIDIA's virtual, forward-compatible GPU assembly language. nvcc compiles device code to PTX first; `ptxas` then assembles PTX into real machine code (**SASS**) for a specific architecture. *(Day 1)*
+**Roofline** — Հասանելի արագագործության գրաֆիկը arithmetic intensity-ի նկատմամբ. անկյունագծային bandwidth-ի առաստաղ, որը հարթվում է հորիզոնական compute-ի առաստաղի։ Այն, թե տանիքի որ մասի տակ է kernel-ը, ասում է՝ հիշողության, թե հրամանների օպտիմալացումը կարող է օգնել։ *(Օր 6)*
 
-**Reconvergence** — The point after a divergent branch where all lanes of the warp execute the same instruction again. From Volta on, lanes have independent program counters and reconvergence at the end of a branch is not guaranteed; `__syncwarp` makes it explicit. *(Day 3)*
+**SASS** — Մեկ կոնկրետ GPU architecture-ի իրական մեքենայական կոդը (cubin), որը `ptxas`-ը հավաքում է PTX-ից։ *(Օր 1)*
 
-**Reduction** — Combining N values into one with an associative operator. On a GPU it is done as a tree: within a warp by shuffles, across warps through shared memory, then by one warp again. *(Day 7)*
+**Sector** — 32-բայթանոց միավորը, որով հիշողությունն իրականում հարցվում և տեղափոխվում է։ Warp-ի դիմումը հաշվվում է sector-ներով, և չորս sector-ը կազմում է մեկ cache line։ Coalescing-ը մեկ հարցումին ընկնող sector-ների նվազեցումն է։ *(Օր 6)*
 
-**Register file** — The per-SM storage from which every thread's registers are allocated. Its size is fixed, so registers per thread and resident warps trade against each other. *(Day 3)*
+**SFU (Special Function Unit)** — SM-ի միավորներ, որոնք հաշվում են transcendental ֆունկցիաներ՝ սինուս, կոսինուս, էքսպոնենտ, հակադարձ, հակադարձ քառակուսի արմատ։ Throughput-ը FP32 միավորներից ցածր է։ *(Օր 1)*
 
-**Resident blocks** — The blocks assigned to one SM at the same time. The count is the smallest of three limits: the hardware cap on blocks per SM, registers per SM divided by the block's register demand, and shared memory per SM divided by the block's shared memory demand. *(Day 2)*
+**Shared memory** — Բյուրեղի վրա գտնվող հիշողություն, հատկացվում է ամեն block-ի և կիսվում նրա thread-երի միջև։ Latency-ն ռեգիստրին մոտ է, կյանքի տևողությունը՝ block-ինը։ Հայտարարվում է `__shared__`-ով՝ ստատիկ կամ launch-ի երրորդ արգումենտով՝ դինամիկ։ *(Օր 5)*
 
-**Roofline** — A plot of achievable performance against arithmetic intensity: a diagonal bandwidth ceiling that flattens into a horizontal compute ceiling. Which part of the roof a kernel sits under says whether memory or instruction optimisations can help it. *(Day 6)*
+**SIMT (Single Instruction, Multiple Threads)** — NVIDIA-ի կատարման մոդելը՝ մեկ հրաման մեկ անգամ է կարդացվում ու վերծանվում և միաժամանակ ուղարկվում warp-ի բոլոր 32 thread-երին։ *(Օր 3)*
 
-**SASS** — The real machine code (cubin) for one specific GPU architecture, assembled from PTX by `ptxas`. *(Day 1)*
+**SM (Streaming Multiprocessor)** — GPU-ի հաշվողական հիմնական միավորը։ Ժամանակակից GPU-ն ունի տասնյակից մինչև հարյուրից ավելի։ Ամեն block ամբողջությամբ մեկ SM-ի վրա է կատարվում։ Ձեր GPU-ի իրական քանակն ու սահմանները `report_device_capabilities()`-ում են։ *(Օր 1)*
 
-**Sector** — The 32-byte unit in which memory is actually requested and moved. A warp's access is counted in sectors, and four sectors make a cache line. Coalescing is the minimisation of sectors per request. *(Day 6)*
+**Stall reason** — Profiler-ի դասակարգումը, թե ինչու warp-ը պատրաստ չէր։ NVIDIA-ն առանձնացնում է չորս խումբ՝ warp-ը սպասում է հրամանի կարդացմանը (instruction fetch), հիշողության կախվածությանը (memory dependency), կատարման կախվածությանը (execution dependency) կամ սինխրոնացման barrier-ին։ Հենց այն է անվանում, ինչ պետք է ուղղել։ *(Օր 3)*
 
-**SFU (Special Function Unit)** — The SM units computing transcendental functions — sine, cosine, exponential, reciprocal, reciprocal square root — at lower throughput than the FP32 units. *(Day 1)*
+**Stream** — GPU-ի գործողությունների՝ kernel-ների և պատճենումների, կարգավորված հերթ։ Տարբեր stream-երի գործողությունները կարող են կատարվել միաժամանակ։ Մեկ stream-ի ներսում գործողությունները կատարվում են ուղարկման հերթականությամբ։ *(Օր 8)*
 
-**Shared memory** — On-chip memory allocated per block and shared by its threads, with latency close to a register access and lifetime equal to the block's. Declared `__shared__`, statically or as the dynamic third launch argument. *(Day 5)*
+**Stream compaction** — Հեռացնել պայմանին չբավարարող տարրերը և մնացածը խտացնել։ Պայմանի վրա կատարված scan-ը ամեն մնացող տարրին տալիս է նրա ելքային index-ը։ *(Օր 7)*
 
-**SIMT (Single Instruction, Multiple Threads)** — NVIDIA's execution model: one instruction is fetched and decoded once and issued to all 32 threads of a warp at the same time. *(Day 3)*
+**Stream-երի կախվածություն** — Stream-երի միջև հերթականություն, որ արտահայտվում է այսպես․ մեկ stream-ում event է գրանցվում, իսկ մյուսը սպասում է դրան `cudaStreamWaitEvent`-ով։ *(Օր 8)*
 
-**SM (Streaming Multiprocessor)** — A GPU's core compute unit; a modern GPU has dozens to over a hundred. Each block runs entirely on one SM. Real counts and limits for your GPU are in `report_device_capabilities()`. *(Day 1)*
+**Swizzling** — Shared memory-ի ինդեքսի խառնում, օրինակ `tile[row][col ^ row]`, որպեսզի ֆիքսված տրամաբանական սյունը ամեն տողում այլ ֆիզիկական bank-ի համապատասխանի՝ հեռացնելով bank conflict-ները առանց լրացնող սյուն ծախսելու։ *(Օր 6)*
 
-**Stall reason** — The profiler's classification of why a warp was not eligible: a memory dependency, a barrier, a busy execution pipe, instruction fetch, and so on. It names what to fix. *(Day 3)*
+**`_sync` վերջածանց** — Նշում է այն intrinsic-ները, որոնք պահանջում են, որ նշված lane-երը միասին հասնեն այդ հրամանին։ Եթե mask-ում նշված lane-երից որևէ մեկը չի հասնում, արդյունքը undefined է, ոչ թե պարզապես դանդաղ։ Առանց վերջածանցի ձևերը հանված են լեզվից։ *(Օր 7)*
 
-**Stream** — An ordered queue of GPU operations, kernels and copies. Operations in different streams may run concurrently; operations within one stream execute in issue order. *(Day 8)*
+**`__syncthreads()`** — Block-ի barrier։ Ոչ մի thread այն չի անցնում, մինչև block-ի բոլոր thread-երը հասնեն, և մինչ այն կատարված shared ու global գրառումները դրանից հետո տեսանելի են block-ին։ Block-ի ամեն thread պետք է հասնի դրան, ուստի divergent control flow-ի ներսում դնելը undefined behaviour է։ *(Օր 5)*
 
-**Stream compaction** — Removing the elements that fail a predicate and packing the rest. A scan over the predicate gives each surviving element its output index. *(Day 7)*
+**`__syncwarp`** — Warp-ի մակարդակի barrier, որը ստիպում է նշված lane-երին միավորվել։ Պետք է այնտեղ, որտեղ կոդը հենվում է lane-երի միասին լինելու վրա, իսկ կոմպիլյատորը չի կարող դա ապացուցել։ *(Օր 7)*
 
-**Stream dependency** — Ordering between streams, expressed by recording an event in one and having another wait on it with `cudaStreamWaitEvent`. *(Day 8)*
+**Tensor Core** — SM-ի մասնագիտացված hardware, compute capability 7.0-ից և նոր, խառը ճշգրտությամբ արագ matrix multiply-accumulate-ի համար։ Օգտագործվում է cuBLAS-ի և cuDNN-ի կողմից, և ուղիղ հասանելի է warp matrix ֆունկցիաներով։ *(Օր 9)*
 
-**Swizzling** — Scrambling a shared-memory index, for example `tile[row][col ^ row]`, so that a fixed logical column maps to a different physical bank on every row, removing bank conflicts without spending a padding column. *(Day 6)*
+**Thread** — Կատարման ամենափոքր միավորը։ Իր block-ի ներսում որոշվում է `threadIdx`-ով, grid-ի ներսում՝ `threadIdx`-ի, `blockIdx`-ի և `blockDim`-ի համակցությամբ։ *(Օր 2)*
 
-**`_sync` suffix** — Marks the intrinsics that require the named lanes to be converged at the instruction. If a lane in the mask does not reach it, the result is undefined rather than merely slow. The unsuffixed forms have been removed from the language. *(Day 7)*
+**Thread coarsening** — Ամեն thread-ին մեկի փոխարեն մի քանի ելքային տարր տալը, որպեսզի մեկ thread-ի հաստատուն ծախսերը՝ ինդեքսի թվաբանությունը, սահմանների ստուգումները, shared memory-ի tile-ի բեռնումը, վճարվեն մեկ անգամ և բաշխվեն։ Grid-stride loop-ը դա գրելու coalescing-ի համար անվտանգ ձևն է։ Զիջում է occupancy-ի հաշվին, ուստի պետք է չափել։ *(Օր 6)*
 
-**`__syncthreads()`** — A barrier for the block: no thread passes it until every thread of the block reaches it, and shared and global writes made before it are visible to the block after it. Every thread of the block must reach it, so placing it inside divergent control flow is undefined behaviour. *(Day 5)*
+**Throughput մեքենա և latency մեքենա** — CPU-ն տարածք է ծախսում cache-երի, branch prediction-ի և out-of-order կատարման վրա, որպեսզի հրամանների մեկ հոսքն արագ լինի, այսինքն՝ latency-ն փոքրացնի։ GPU-ն նույն տարածքը ծախսում է execution unit-ների և register file-ի վրա, որպեսզի շատ warp պահի աշխատանքի մեջ։ Latency-ն հանելու փոխարեն այն հանդուրժում է։ *(Օր 1)*
 
-**`__syncwarp`** — A warp-level barrier forcing the named lanes to converge. Needed where code depends on lanes being together and the compiler cannot prove that they are. *(Day 7)*
+**Tiling** — Տվյալների մի կտոր մեկ անգամ shared memory տեղափոխել և չիպի վրա շատ անգամ կարդալ, ինչը կրճատում է global տրաֆիկը մոտավորապես կրկնակի օգտագործման գործակցի չափով։ Այս տեխնիկան է tiled matrix multiply-ի և այս դասընթացի ամեն stencil ու ֆիլտր kernel-ի հիմքում։ *(Օր 5)*
 
-**Tensor Core** — Specialised SM hardware, compute capability 7.0 and newer, for fast mixed-precision matrix multiply-accumulate. Used by cuBLAS and cuDNN, and reachable directly through the warp matrix functions. *(Day 9)*
+**Unified հիշողություն** — Մեկ հատկացում՝ `cudaMallocManaged`, հասցեագրելի և host-ից, և device-ից, և driver-ը էջերը տեղափոխում է նրանց միջև ըստ պահանջի։ *(Օր 4)*
 
-**Theoretical peak bandwidth** — Bus width times memory clock times transfers per clock, computed from the device numbers recorded on Day 1. The ceiling a kernel is measured against. *(Day 6)*
+**Virtual և real architecture** — `-arch=compute_XX`-ը նշում է virtual architecture-ը, որի համար PTX է գեներացվում, իսկ `-code=sm_XX`-ը՝ real architecture-ը, որի համար SASS է գեներացվում։ `-arch=sm_XX`-ը երկուսն էլ սահմանում է։ *(Օր 1)*
 
-**Thread** — The smallest unit of execution; identified within its block by `threadIdx`, within the grid by combining `threadIdx` with `blockIdx` and `blockDim`. *(Day 2)*
+**Warp** — Block-ի ներսում 32 thread-ից բաղկացած խումբ, որը hardware-ը պլանավորում և կատարում է միասին. մեկ հրաման միաժամանակ ուղարկվում է բոլոր 32-ին, ուստի ցանկացած պահի բոլորը նույն հրամանի վրա են։ Warp մակարդակի intrinsic-ները հենց այս միավորի վրա են աշխատում։ *(Օր 3)*
 
-**Thread coarsening** — Giving each thread several output elements instead of one, so per-thread fixed costs — index arithmetic, bounds checks, shared-memory tile loads — are paid once and amortised. A grid-stride loop is the coalescing-safe way to write it. It trades against occupancy, so it has to be measured. *(Day 6)*
+**Warp scheduler** — SM-ի միավոր, որն ամեն ցիկլ ընտրում է մեկ պատրաստ (eligible) warp և նրա հաջորդ հրամանն ուղարկում execution unit-ներին։ SM-ում մի քանիսն է լինում։ *(Օր 1)*
 
-**Throughput machine and latency machine** — A CPU spends area on caches, branch prediction and out-of-order execution to make one instruction stream fast, that is, to reduce latency. A GPU spends the same area on execution units and register file to keep many warps in flight, and tolerates latency instead of removing it. *(Day 1)*
+**Warp shuffle** — `__shfl_sync`, `__shfl_up_sync`, `__shfl_down_sync`, `__shfl_xor_sync` հրամանների ընտանիքը, որը lane-ին թույլ է տալիս կարդալ նույն warp-ի մեկ այլ lane-ի ռեգիստրը՝ առանց հիշողության դիմումի և առանց barrier-ի։ *(Օր 7)*
 
-**Tiling** — Staging a block of data in shared memory once and reading it many times on chip, cutting global traffic by roughly the reuse factor. The technique behind tiled matrix multiply and every stencil and filter kernel in this course. *(Day 5)*
+**Warp-aggregated atomic-ներ** — Warp-ի ամբողջ ներդրման համար մեկ atomic, որ կատարում է մեկ lane՝ այն նախապես հաշվելով ballot-ով և warp reduction-ով։ Atomic-ների քանակը կրճատում է մինչև 32 անգամ։ Privatisation-ի դեպքն է՝ warp-ի մակարդակում։ *(Օր 7)*
 
-**Unified memory** — One allocation, `cudaMallocManaged`, addressable from both host and device, with the driver migrating pages between them on demand. *(Day 4)*
+**XOR (butterfly) փոխանակում** — `__shfl_xor_sync(mask, v, k)`. lane `i`-ն փոխանակում է lane `i ^ k`-ի հետ։ Մեկ հրամանով ամեն lane և՛ ուղարկում է, և՛ ստանում, և հենց դրա համար է այս ձևն օգտագործվում, երբ արդյունքը պետք է բոլոր lane-երին։ *(Օր 7)*
 
-**Virtual and real architecture** — `-arch=compute_XX` names the virtual architecture PTX is generated for; `-code=sm_XX` names the real architecture SASS is generated for. `-arch=sm_XX` sets both. *(Day 1)*
+**Ամբողջ grid-ի սինխրոնացում** — Barrier grid-ի բոլոր block-երի համար, հասանելի cooperative groups-ով, և միայն `cudaLaunchCooperativeKernel`-ով գործարկված kernel-ների համար, որոնց չափն այնպիսին է, որ բոլոր block-երը միաժամանակ resident են։ *(Օր 9)*
 
-**Warp** — A group of 32 threads within a block that the hardware schedules and executes together: one instruction is issued to all 32 at the same time, so at any moment they are on the same instruction. The unit warp-level intrinsics operate on. *(Day 3)*
+**Խառը ճշգրտություն (mixed precision)** — Հաշվել նեղ ձևաչափով, իսկ կուտակել ավելի լայնով, սովորաբար fp16 կամ bf16 մուտքեր և fp32 կուտակում։ Tensor core-երը հենց այդպես են աշխատում։ *(Օր 9)*
 
-**Warp-aggregated atomics** — Having one lane perform a single atomic for the whole warp's contribution, computed first by a ballot and a warp reduction. Reduces the number of atomics by up to 32 times; the warp-scoped case of privatisation. *(Day 7)*
+**Հասած bandwidth** — Kernel-ի իրականում տեղափոխած բայթերը բաժանած նրա աշխատանքի ժամանակի վրա, սովորաբար արտահայտված որպես տեսական peak-ի տոկոս։ *(Օր 6)*
 
-**Warp scheduler** — The SM unit that each cycle selects one eligible warp and issues its next instruction to the execution units. An SM has several. *(Day 1)*
+**Հիշողության bandwidth** — Բայթ վայրկյանում SM-երի և device-ի հիշողության միջև։ Տեսական peak-ը bus width-ն է բազմապատկած հիշողության clock-ով և մեկ clock-ի փոխանցումների քանակով. հասած թիվը այն է, ինչին kernel-ն իրականում հասնում է։ *(Օր 4)*
 
-**Warp shuffle** — The instruction family `__shfl_sync`, `__shfl_up_sync`, `__shfl_down_sync`, `__shfl_xor_sync`, which lets a lane read a register of another lane in the same warp with no memory access and no barrier. *(Day 7)*
+**Հրամանների pipeline** — Փուլերը, որոնցով անցնում է հրամանը՝ fetch, decode, register read, execute, memory, writeback։ Միաժամանակ մի քանի հրաման է շարժման մեջ՝ մեկը ամեն փուլում։ *(Օր 3)*
 
-**XOR (butterfly) exchange** — `__shfl_xor_sync(mask, v, k)`: lane `i` exchanges with lane `i ^ k`. Every lane both sends and receives in one instruction, which is why it is the form used when all lanes need the result. *(Day 7)*
+**Տեսական peak bandwidth** — Bus width-ը բազմապատկած հիշողության clock-ով և մեկ clock-ի փոխանցումների քանակով, հաշված Օր 1-ին գրանցած թվերից։ Այն առաստաղը, որի դեմ չափվում է kernel-ը։ *(Օր 6)*
 

@@ -1,99 +1,99 @@
-# Day 7: Warp Intrinsics, Reduction and Atomics
+# Օր 7. Warp intrinsic-ներ, reduction և atomic-ներ
 
-## Objectives
-- Use warp shuffle functions for intra-warp communication without shared memory or barriers
-- State what the lane mask asserts, and why a `_sync` intrinsic in a divergent branch is undefined behaviour rather than merely slow
-- Implement warp-level reduction and extend it to a block with the warp to shared to warp pattern
-- Implement an inclusive warp scan, and use `__ballot_sync` with `__popc` for binary predicates
-- Explain why atomic contention serialises, and apply privatisation
+## Նպատակներ
+- Օգտագործել warp shuffle ֆունկցիաները warp-ի ներսում տվյալներ փոխանակելու համար՝ առանց shared memory-ի և barrier-ների
+- Ասել, թե ինչ է պնդում lane mask-ը, և ինչու է divergent branch-ում կանչված `_sync` intrinsic-ը undefined behaviour, ոչ թե պարզապես դանդաղ
+- Իրականացնել warp-ի մակարդակի reduction և ընդլայնել այն block-ի վրա՝ warp, ապա shared memory, ապա կրկին warp սխեմայով
+- Իրականացնել warp-ի ներսում inclusive scan, և երկուական պայմանների համար օգտագործել `__ballot_sync`-ը `__popc`-ի հետ
+- Բացատրել, թե ինչու է atomic-ների մրցակցությունը սերիականացնում կատարումը, և կիրառել privatisation
 
-## Key Concepts
+## Հիմնական հասկացություններ
 - `__shfl_down_sync`, `__shfl_up_sync`, `__shfl_xor_sync`, `__shfl_sync`
-- Lane mask, divergence, and identity values for out-of-range lanes
-- Hierarchical reduction: warp, then shared, then warp
-- Inclusive scan (Kogge-Stone) and stream compaction
+- Lane mask, divergence, և չեզոք արժեքներ սահմանից դուրս lane-երի համար
+- Հիերարխիկ reduction՝ warp, ապա shared memory, ապա warp
+- Inclusive scan (Kogge-Stone) և stream compaction
 - `__syncwarp`, `__activemask`, `__ballot_sync`
-- Atomics execute at L2; contention on one address serialises
-- Privatisation into shared memory; warp-aggregated atomics
+- Atomic-ները կատարվում են L2-ում. մեկ հասցեի վրա մրցակցությունը սերիականացնում է
+- Privatisation shared memory-ում. warp-aggregated atomic-ներ
 
-## Definitions
-**Lane** — A thread's position within its warp, 0 to 31.
+## Սահմանումներ
+**Lane** — Thread-ի դիրքը իր warp-ում՝ 0-ից 31։
 
-**Warp shuffle** — The instruction family `__shfl_sync`, `__shfl_up_sync`, `__shfl_down_sync`, `__shfl_xor_sync`, which lets a lane read a register of another lane in the same warp with no memory access and no barrier.
+**Warp shuffle** — `__shfl_sync`, `__shfl_up_sync`, `__shfl_down_sync`, `__shfl_xor_sync` հրամանների ընտանիքը, որը lane-ին թույլ է տալիս կարդալ նույն warp-ի մեկ այլ lane-ի ռեգիստրը՝ առանց հիշողության դիմումի և առանց barrier-ի։
 
-**Lane mask** — The 32-bit first argument of every `_sync` intrinsic, one bit per lane, naming the lanes that must take part. `0xffffffff` means the whole warp.
+**Lane mask** — Ամեն `_sync` intrinsic-ի առաջին՝ 32-բիթանոց արգումենտը, մեկ բիթ ամեն lane-ի համար։ Նշում է այն lane-երը, որոնք պետք է մասնակցեն։ `0xffffffff`-ը նշանակում է ամբողջ warp-ը։
 
-**`_sync` suffix** — Marks the intrinsics that require the named lanes to be converged at the instruction. If a lane in the mask does not reach it, the result is undefined rather than merely slow. The unsuffixed forms have been removed from the language.
+**`_sync` վերջածանց** — Նշում է այն intrinsic-ները, որոնք պահանջում են, որ նշված lane-երը միասին հասնեն այդ հրամանին։ Եթե mask-ում նշված lane-երից որևէ մեկը չի հասնում, արդյունքը undefined է, ոչ թե պարզապես դանդաղ։ Առանց վերջածանցի ձևերը հանված են լեզվից։
 
-**XOR (butterfly) exchange** — `__shfl_xor_sync(mask, v, k)`: lane `i` exchanges with lane `i ^ k`. Every lane both sends and receives in one instruction, which is why it is the form used when all lanes need the result.
+**XOR (butterfly) փոխանակում** — `__shfl_xor_sync(mask, v, k)`. lane `i`-ն փոխանակում է lane `i ^ k`-ի հետ։ Մեկ հրամանով ամեն lane և՛ ուղարկում է, և՛ ստանում, և հենց դրա համար է այս ձևն օգտագործվում, երբ արդյունքը պետք է բոլոր lane-երին։
 
-**Reduction** — Combining N values into one with an associative operator. On a GPU it is done as a tree: within a warp by shuffles, across warps through shared memory, then by one warp again.
+**Reduction** — N արժեքը մեկ արժեքի միավորել ասոցիատիվ գործողությամբ։ GPU-ի վրա արվում է ծառի տեսքով՝ warp-ի ներսում shuffle-ներով, warp-երի միջև shared memory-ով, ապա կրկին մեկ warp-ով։
 
-**Inclusive and exclusive scan** — Prefix sums. Element i of an inclusive scan is the combination of elements 0 to i; of an exclusive scan, elements 0 to i-1.
+**Inclusive և exclusive scan** — Նախածանցային գումարներ (prefix sums)։ Inclusive scan-ի i-րդ տարրը 0-ից i տարրերի համակցությունն է, exclusive scan-ինը՝ 0-ից i-1։
 
-**Kogge-Stone** — The scan formulation used inside a warp: at step k every lane adds the value from the lane k positions below it, with k doubling each step. Five steps for a 32-lane warp.
+**Kogge-Stone** — Warp-ի ներսում օգտագործվող scan-ի ձևը. k-րդ քայլում ամեն lane իրեն գումարում է իրենից k դիրքով ցածր lane-ի արժեքը, և k-ն ամեն քայլ կրկնապատկվում է։ 32 lane-անոց warp-ի համար հինգ քայլ է։
 
-**Stream compaction** — Removing the elements that fail a predicate and packing the rest. A scan over the predicate gives each surviving element its output index.
+**Stream compaction** — Հեռացնել պայմանին չբավարարող տարրերը և մնացածը խտացնել։ Պայմանի վրա կատարված scan-ը ամեն մնացող տարրին տալիս է նրա ելքային index-ը։
 
-**`__ballot_sync`** — Returns a 32-bit mask with bit N set if lane N's predicate was true, delivered to every participating lane.
+**`__ballot_sync`** — Վերադարձնում է 32-բիթանոց mask, որում N-րդ բիթը դրված է, եթե N-րդ lane-ի պայմանը ճիշտ էր։ Արդյունքը ստանում են բոլոր մասնակից lane-երը։
 
-**`__popc`** — Counts the set bits of a 32-bit value. Applied to a ballot result it counts the lanes that satisfied the predicate.
+**`__popc`** — Հաշվում է 32-բիթանոց արժեքի մեկ դրված բիթերը։ Ballot-ի արդյունքի վրա կիրառելիս հաշվում է պայմանին բավարարող lane-երը։
 
-**`__activemask`** — Returns which lanes are converged at this instruction. It reports what happens to be true, and is not a substitute for a mask the code determines itself.
+**`__activemask`** — Վերադարձնում է այն lane-երը, որոնք այս հրամանին միասին են հասել։ Ցույց է տալիս, թե ինչպես է պատահաբար ստացվել, և չի փոխարինում այն mask-ին, որ կոդն ինքը պետք է որոշի։
 
-**`__syncwarp`** — A warp-level barrier forcing the named lanes to converge. Needed where code depends on lanes being together and the compiler cannot prove that they are.
+**`__syncwarp`** — Warp-ի մակարդակի barrier, որը ստիպում է նշված lane-երին միավորվել։ Պետք է այնտեղ, որտեղ կոդը հենվում է lane-երի միասին լինելու վրա, իսկ կոմպիլյատորը չի կարող դա ապացուցել։
 
-**Atomic operation** — A read-modify-write on one address that no other thread can interleave with: `atomicAdd`, `atomicCAS`, `atomicMax` and the rest.
+**Atomic գործողություն** — Կարդալ-փոխել-գրել մեկ հասցեի վրա, որի մեջ ոչ մի այլ thread չի կարող միջամտել՝ `atomicAdd`, `atomicCAS`, `atomicMax` և մյուսները։
 
-**Atomic contention** — Several threads targeting the same address. The updates serialise at L2, so the cost grows with the number of colliding threads, not with the number of atomic instructions.
+**Atomic-ների մրցակցություն (contention)** — Մի քանի thread դիմում է նույն հասցեին։ Թարմացումները սերիականացվում են L2-ում, ուստի գինն աճում է բախվող thread-երի քանակով, ոչ թե atomic հրամանների քանակով։
 
-**Privatisation** — Giving each block, or each warp, a private copy of a contended accumulator, updating that copy locally, and merging once at the end. Turns one global atomic per input element into a few per block. The standard fix for atomic contention.
+**Privatisation** — Ամեն block-ին կամ ամեն warp-ին տալ մրցակցային կուտակիչի սեփական պատճենը, թարմացնել այն տեղում և վերջում մեկ անգամ միավորել։ Յուրաքանչյուր մուտքային տարրի համար մեկ global atomic-ը դառնում է մի քանի atomic ամբողջ block-ի համար։ Atomic-ների մրցակցության ստանդարտ լուծումն է։
 
-**Warp-aggregated atomics** — Having one lane perform a single atomic for the whole warp's contribution, computed first by a ballot and a warp reduction. Reduces the number of atomics by up to 32 times; the warp-scoped case of privatisation.
+**Warp-aggregated atomic-ներ** — Warp-ի ամբողջ ներդրման համար մեկ atomic, որ կատարում է մեկ lane՝ այն նախապես հաշվելով ballot-ով և warp reduction-ով։ Atomic-ների քանակը կրճատում է մինչև 32 անգամ։ Privatisation-ի դեպքն է՝ warp-ի մակարդակում։
 
-**Cooperative groups** — An API that makes the group a piece of code synchronises over explicit — the block, the currently converged lanes, the whole grid — instead of implicit in `__syncthreads()`.
+**Cooperative groups** — API, որը բացահայտ է դարձնում, թե կոդն ինչ խմբի վրա է սինխրոնանում՝ block, այս պահին միասին գտնվող lane-եր, ամբողջ grid։ `__syncthreads()`-ում այդ խումբը թաքնված է։
 
-## Why shuffles win
-Shuffles move data register to register, touching no memory at all. That is why they beat a shared-memory reduction, and also why the advantage disappears once the data no longer fits in a warp's registers.
+## Ինչու են shuffle-ները հաղթում
+Shuffle-ները տվյալները տեղափոխում են ռեգիստրից ռեգիստր, հիշողությանն ընդհանրապես չդիմելով։ Հենց դրա համար են գերազանցում shared memory-ով reduction-ին, և հենց դրա համար է այդ առավելությունը անհետանում, երբ տվյալներն այլևս չեն տեղավորվում warp-ի ռեգիստրներում։
 
-## Visual
-![Warp shuffle reduction over 8 lanes, each step halving the offset (4, 2, 1) through __shfl_down_sync until lane 0 holds the total](warp_reduction.svg)
+## Պատկեր
+![Warp shuffle reduction 8 lane-ի վրա. ամեն քայլ offset-ը կիսվում է (4, 2, 1) __shfl_down_sync-ով, մինչև lane 0-ն պահում է ընդհանուր գումարը](warp_reduction.svg)
 
-`__shfl_down_sync` lets a lane read a value straight out of another lane's register, with no shared memory and no `__syncthreads()`. Halving the offset each step — 16, 8, 4, 2, 1 for a full warp — sums 32 values in five steps, with lane 0 holding the result.
+`__shfl_down_sync`-ը թույլ է տալիս lane-ին արժեքը կարդալ ուղիղ այլ lane-ի ռեգիստրից՝ առանց shared memory-ի և առանց `__syncthreads()`-ի։ Ամեն քայլ offset-ը կիսելով 32 արժեքը գումարվում է հինգ քայլով, և արդյունքը մնում է lane 0-ում։ Ամբողջ warp-ի համար offset-ները 16, 8, 4, 2, 1 են։
 
-![__ballot_sync collecting a warp's 32 boolean predicates into a single 32-bit mask, one bit per lane](warp_ballot.svg)
+![__ballot_sync-ը warp-ի 32 բուլյան պայմանները հավաքում է մեկ 32-բիթանոց mask-ի մեջ, մեկ բիթ ամեն lane-ի համար](warp_ballot.svg)
 
-`__ballot_sync` turns "which lanes satisfy this condition" into one 32-bit integer that every lane receives: bit N is set if and only if lane N's predicate was true. Combined with `__popc` it counts them in one instruction, and it is the same mechanism `__activemask` and `__syncwarp` use to know which lanes are still participating.
+`__ballot_sync`-ը «որ lane-երն են բավարարում այս պայմանին» հարցը դարձնում է մեկ 32-բիթանոց ամբողջ թիվ, որ ստանում է ամեն lane։ N-րդ բիթը դրված է այն և միայն այն դեպքում, երբ N-րդ lane-ի պայմանը ճիշտ էր։ `__popc`-ի հետ միասին դրանք հաշվում է մեկ հրամանով։ Նույն մեխանիզմով են `__activemask`-ը և `__syncwarp`-ը իմանում, թե որ lane-երն են դեռ մասնակցում։
 
-## Animated
-![8 lanes cycling through three shuffle intrinsics: __shfl_down_sync where lane i reads from lane i+1, __shfl_up_sync where lane i reads from lane i-1, and __shfl_xor_sync where lanes swap in pairs](warp_shuffle_intrinsics.svg)
+## Անիմացիա
+![8 lane-ը հերթով երեք shuffle intrinsic-ի տակ. __shfl_down_sync, որտեղ lane i-ն կարդում է lane i+1-ից, __shfl_up_sync, որտեղ lane i-ն կարդում է lane i-1-ից, և __shfl_xor_sync, որտեղ lane-երը զույգերով փոխանակվում են](warp_shuffle_intrinsics.svg)
 
-The same eight lanes under three intrinsics. `__shfl_down_sync` and `__shfl_up_sync` shift values one direction by a fixed offset; `__shfl_xor_sync` exchanges values between paired lanes (`i` and `i ^ mask`), so every lane both sends and receives in one instruction. That is what makes it the form used for butterfly reductions.
+Նույն ութ lane-ը՝ երեք intrinsic-ի տակ։ `__shfl_down_sync`-ը և `__shfl_up_sync`-ը արժեքները տեղաշարժում են մեկ ուղղությամբ՝ ֆիքսված offset-ով։ `__shfl_xor_sync`-ը արժեքները փոխանակում է զույգ lane-երի միջև (`i` և `i ^ mask`), ուստի մեկ հրամանով ամեն lane և՛ ուղարկում է, և՛ ստանում։ Հենց դրա համար է այն օգտագործվում butterfly reduction-ում։
 
-## Resources
+## Գրականություն
 - [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 7.22. Warp Shuffle Functions · 7.14. Atomic Functions · 8. Cooperative Groups
-- [`INTRINSICS.md`](../INTRINSICS.md) — shuffle, vote, bit operations, atomics in one table
-- CUB device-wide reduction and scan: https://nvidia.github.io/cccl/cub/
+- [`INTRINSICS.md`](../INTRINSICS.md) — shuffle, vote, բիթային գործողություններ և atomic-ներ՝ մեկ աղյուսակում
+- CUB-ի device-wide reduction և scan: https://nvidia.github.io/cccl/cub/
 
-## Hands-On Task
-Compute the mean of a real image using warp reduction plus `atomicAdd`, then a 256-bin histogram twice — once with global atomics, once privatised into shared memory.
+## Լաբորատոր առաջադրանք
+Հաշվել իրական պատկերի միջին արժեքը warp reduction-ով և `atomicAdd`-ով։ Ապա 256 bin-անոց histogram երկու անգամ՝ մեկ անգամ global atomic-ներով, մեկ անգամ privatised՝ shared memory-ում։
 
-## Self-Learning
-1. Implement warp sum reduction with `__shfl_down_sync`. Verify against a host loop for `n = 1024` filled with ones; the result must be exactly `n`.
-2. Extend to `block_reduce_sum` with the warp to shared to warp pattern, then reduce the grid by having thread 0 of each block `atomicAdd` its total. Count the `__syncthreads()` calls against a classic shared-memory tree reduction and time both.
-3. Implement an inclusive scan within a warp and use it to compact the indices of pixels above a threshold.
-4. Redo task 3 with `__ballot_sync` and `__popc`, and compare.
-5. Implement the 256-bin histogram both ways. Time both on a large image, then on an image that is nearly one shade. Explain whether the gap widens or narrows.
-6. Replace the shared-memory `atomicAdd` with `atomicAdd_block` and measure.
+## Ինքնուրույն աշխատանք
+1. Իրականացնել warp-ի գումարման reduction `__shfl_down_sync`-ով։ Ստուգել host-ի ցիկլի դեմ `n = 1024` մեկերով լցված զանգվածի վրա. արդյունքը պետք է ճշգրիտ `n` լինի։
+2. Ընդլայնել մինչև `block_reduce_sum`՝ warp, shared memory, warp սխեմայով, ապա grid-ը reduction անել՝ ամեն block-ի thread 0-ն իր գումարը ավելացնում է `atomicAdd`-ով։ Հաշվել `__syncthreads()`-ի կանչերը դասական shared memory ծառային reduction-ի համեմատ և չափել երկուսի ժամանակը։
+3. Իրականացնել warp-ի ներսում inclusive scan և դրանով խտացնել շեմից բարձր պիքսելների index-ները։
+4. Կրկնել 3-րդ առաջադրանքը `__ballot_sync`-ով և `__popc`-ով, և համեմատել։
+5. Իրականացնել 256 bin-անոց histogram երկու ձևով։ Չափել երկուսը մեծ պատկերի վրա, ապա գրեթե միագույն պատկերի վրա։ Բացատրել՝ տարբերությունը մեծանում է, թե փոքրանում։
+6. Shared memory-ի `atomicAdd`-ը փոխարինել `atomicAdd_block`-ով և չափել։
 
-## Self-Check
-No answers given.
+## Ինքնաստուգում
+Պատասխանները տրված չեն։
 
-1. Why does `__shfl_down_sync` not need `__syncthreads()`?
-2. After five steps of the reduction, why is lane 0 specifically guaranteed to hold the total?
-3. Passing `0xFFFFFFFF` when only some lanes reach the instruction is undefined behaviour. Why is a correct answer on your GPU not evidence of correctness?
-4. Privatisation adds a zeroing pass, two barriers and a merge pass. Describe an input where that is a net loss.
-5. Why is a shared-memory `atomicAdd` cheaper than a global one, when both serialise on collision?
+1. Ինչու՞ `__shfl_down_sync`-ին `__syncthreads()` պետք չէ։
+2. Reduction-ի հինգ քայլից հետո ինչու՞ է հենց lane 0-ն երաշխավորված պահում ընդհանուր գումարը։
+3. `0xFFFFFFFF` փոխանցելը, երբ հրամանին հասնում են lane-երի միայն մի մասը, undefined behaviour է։ Ինչու՞ ձեր GPU-ի վրա ստացված ճիշտ պատասխանը ճշտության ապացույց չէ։
+4. Privatisation-ը ավելացնում է զրոյացման անցում, երկու barrier և միավորման անցում։ Նկարագրել մուտք, որի դեպքում դա ընդհանուր առմամբ կորուստ է։
+5. Ինչու՞ է shared memory-ի `atomicAdd`-ը global-ից էժան, եթե երկուսն էլ բախման դեպքում սերիականացվում են։
 
-## Code Template
-See [`template.cu`](template.cu).
+## Կոդի template
+Տես [`template.cu`](template.cu)։

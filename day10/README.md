@@ -1,26 +1,21 @@
-# Day 10: Discussion of Proposals
+# Օր 10. Առաջարկների քննարկում
 
-## Format
+## Ձևաչափ
 
-Participants present the student-work proposals they have prepared during the course and
-the group discusses them. Three categories are in scope:
+Մասնակիցները ներկայացնում են դասընթացի ընթացքում պատրաստած ուսանողական աշխատանքների առաջարկները, և խումբը քննարկում է դրանք։ Երեք տեսակ է ընդգրկված․
 
-- course project (կուրսային աշխատանք)
-- diploma work (դիպլոմային աշխատանք)
-- master's thesis (մագիստրոսական թեզ)
+- կուրսային աշխատանք
+- դիպլոմային աշխատանք
+- մագիստրոսական թեզ
 
-There is no required form and no length requirement. What to present is left to each
-participant. A proposal may be taken directly from [`topics-bank.md`](topics-bank.md),
-adapted from it, or written from scratch.
+Պարտադիր ձև և ծավալի պահանջ չկա։ Թե ինչ ներկայացնել, որոշում է ամեն մասնակից։ Առաջարկը կարելի է վերցնել ուղիղ [`topics-bank.md`](topics-bank.md)-ից, հարմարեցնել այնտեղից, կամ գրել զրոյից։
 
-## What the discussion covers
+## Ինչ է քննարկվում
 
-Whatever the proposals raise. The material from Days 1 to 9 is the common ground the
-group has: the cluster GPU's real numbers from Day 1, the profiling method from Days 3
-and 6, the library and precision trade-offs from Day 9.
+Այն, ինչ բարձրացնում են առաջարկները։ Օրեր 1–9-ի նյութը խմբի ընդհանուր հիմքն է՝ կլաստերի GPU-ի իրական թվերը Օր 1-ից, profiling-ի մեթոդը Օր 3-ից և Օր 6-ից, գրադարանների և ճշգրտության փոխզիջումները Օր 9-ից։
 
-## Resources
+## Գրականություն
 
-- [`topics-bank.md`](topics-bank.md) — worked examples to take from or adapt
-- [`PERFORMANCE.md`](../PERFORMANCE.md) — optimisation order and stopping criteria
-- [`TASKS.md`](../TASKS.md) — practice tasks, grouped by day
+- [`topics-bank.md`](topics-bank.md) — օրինակներ, որ կարելի է վերցնել կամ հարմարեցնել
+- [`PERFORMANCE.md`](../PERFORMANCE.md) — օպտիմալացման հերթականությունը և դադարելու չափանիշները
+- [`TASKS.md`](../TASKS.md) — գործնական առաջադրանքներ՝ խմբավորված ըստ օրերի

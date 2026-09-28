@@ -1,41 +1,41 @@
-# Day 2: Thread Hierarchy, Indexing and Launch Configuration
+# Օր 2. Thread-երի հիերարխիան, ինդեքսավորումը և launch configuration-ը
 
-## Objectives
-- Divide work across threads, blocks and grids, for 1D and 2D data
-- Write the global-index formula and explain why it has the shape it has
-- Recognise coalesced and uncoalesced indexing, and index so that a warp's accesses are contiguous
-- Choose a block size, and check the choice with `cudaOccupancyMaxActiveBlocksPerMultiprocessor`
-- Write a grid-stride loop that is correct for any input size at a fixed launch configuration
+## Նպատակներ
+- Բաժանել աշխատանքը thread-երի, block-երի և grid-ի միջև՝ 1D և 2D տվյալների համար
+- Գրել global index-ի բանաձևը և բացատրել, թե ինչու է այն հենց այդ տեսքն ունի
+- Տարբերել coalesced և uncoalesced ինդեքսավորումը, և ինդեքսավորել այնպես, որ warp-ի դիմումները հարակից լինեն
+- Ընտրել block size և ստուգել ընտրությունը `cudaOccupancyMaxActiveBlocksPerMultiprocessor`-ով
+- Գրել grid-stride loop, որը ճիշտ է մուտքի ցանկացած չափի համար՝ նույն launch configuration-ով
 
-## Key Concepts
-- Threads, blocks, grids: structure and enumeration
-- Launch configuration and kernel invocation
-- 1D and 2D thread indexing
-- Memory coalescing as a consequence of the index formula
-- Occupancy and block-size choice (first pass; the hardware reason comes on Day 3 and Day 6)
-- Grid-stride loops
+## Հիմնական հասկացություններ
+- Thread, block, grid՝ կառուցվածքը և համարակալումը
+- Launch configuration և kernel-ի կանչ
+- 1D և 2D thread ինդեքսավորում
+- Memory coalescing-ը որպես ինդեքսի բանաձևի հետևանք
+- Occupancy և block size-ի ընտրություն (առաջին անգամ. hardware-ի պատճառը՝ Օր 3 և Օր 6)
+- Grid-stride loop
 
-## Definitions
-**Thread** — The smallest unit of execution; identified within its block by `threadIdx`, within the grid by combining `threadIdx` with `blockIdx` and `blockDim`.
+## Սահմանումներ
+**Thread** — Կատարման ամենափոքր միավորը։ Իր block-ի ներսում որոշվում է `threadIdx`-ով, grid-ի ներսում՝ `threadIdx`-ի, `blockIdx`-ի և `blockDim`-ի համակցությամբ։
 
-**Block** — A group of threads, up to `maxThreadsPerBlock`, that execute on the same SM and can cooperate through shared memory and `__syncthreads()`. A kernel launch creates a grid of blocks.
+**Block** — Thread-երի խումբ, մինչև `maxThreadsPerBlock`, որոնք կատարվում են նույն SM-ի վրա և կարող են համագործակցել shared memory-ով ու `__syncthreads()`-ով։ Kernel-ի launch-ը ստեղծում է block-երի grid։
 
-**Grid** — The full set of blocks launched by one kernel call, `<<<grid, block>>>`.
+**Grid** — Մեկ kernel-ի կանչով գործարկված block-երի ամբողջությունը՝ `<<<grid, block>>>`։
 
-**Launch configuration** — The arguments of a kernel call: grid dimensions in blocks and block dimensions in threads, each up to three-dimensional, plus optional dynamic shared memory size and stream.
+**Launch configuration** — Kernel-ի կանչի արգումենտները՝ grid-ի չափերը block-երով և block-ի չափերը thread-երով, ամեն մեկը մինչև երեքչափանի, գումարած ոչ պարտադիր dynamic shared memory-ի չափը և stream-ը։
 
-**`blockIdx`, `threadIdx`, `blockDim`, `gridDim`** — Built-in variables, available in device code without being declared or passed: the block's index in the grid, the thread's index in the block, the block's dimensions, the grid's dimensions. They are read-only, of type `uint3` (`dim3` for the dimensions), and each thread sees its own values.
+**`blockIdx`, `threadIdx`, `blockDim`, `gridDim`** — Ներկառուցված (built-in) փոփոխականներ, հասանելի device-ի կոդում առանց հայտարարելու կամ փոխանցելու՝ block-ի index-ը grid-ում, thread-ի index-ը block-ում, block-ի չափերը, grid-ի չափերը։ Միայն-կարդալու են, `uint3` տիպի (չափերը՝ `dim3`), և ամեն thread տեսնում է իր սեփական արժեքները։
 
-Nothing in your code initialises them, and they are not ordinary variables sitting in memory:
+Ձեր կոդում ոչինչ դրանք չի սկզբնարժեքավորում, և դրանք հիշողության մեջ դրված սովորական փոփոխականներ չեն․
 
-| Variable | PTX | Set by |
+| Փոփոխական | PTX | Ում կողմից է դրվում |
 |---|---|---|
-| `threadIdx` | `%tid` | the hardware, when the SM creates the block's threads |
-| `blockIdx` | `%ctaid` | the GPU's work distributor, when it assigns the block to an SM |
-| `blockDim` | `%ntid` | the launch configuration — the host wrote it in `<<<grid, block>>>` |
-| `gridDim` | `%nctaid` | the launch configuration, likewise |
+| `threadIdx` | `%tid` | hardware-ի, երբ SM-ը ստեղծում է block-ի thread-երը |
+| `blockIdx` | `%ctaid` | GPU-ի work distributor-ի, երբ block-ը վերագրում է SM-ին |
+| `blockDim` | `%ntid` | launch configuration-ի. host-ը այն գրել է `<<<grid, block>>>`-ում |
+| `gridDim` | `%nctaid` | նույն կերպ՝ launch configuration-ի |
 
-So the first two are hardware identity and the second two are launch parameters, which is why the second two are the same for every thread in the grid. Reading one is an instruction, not a memory access. In the Day 1 example, the PTX
+Առաջին երկուսը hardware-ի ինքնությունն են, մյուս երկուսը՝ launch-ի պարամետրերը, և հենց դրա համար են վերջին երկուսը նույնը grid-ի բոլոր thread-երի համար։ Դրանցից որևէ մեկը կարդալը հրաման է, ոչ թե հիշողության դիմում։ Օր 1-ի օրինակում PTX-ը
 
 ```ptx
 mov.u32  %r3, %ntid.x;     // blockDim.x
@@ -43,31 +43,31 @@ mov.u32  %r4, %ctaid.x;    // blockIdx.x
 mov.u32  %r5, %tid.x;      // threadIdx.x
 ```
 
-becomes SASS in which `threadIdx` and `blockIdx` are read with a special-register instruction while `blockDim` is read straight out of the constant bank:
+դառնում է SASS, որտեղ `threadIdx`-ը և `blockIdx`-ը կարդացվում են special register-ի հրամանով, իսկ `blockDim`-ը՝ ուղիղ constant bank-ից․
 
 ```sass
 S2R  R6, SR_CTAID.X ;
 S2R  R3, SR_TID.X ;
-IMAD R6, R6, c[0x0][0x0], R3 ;   // c[0x0][0x0] is blockDim.x
+IMAD R6, R6, c[0x0][0x0], R3 ;   // c[0x0][0x0]-ն blockDim.x-ն է
 ```
 
-**Resident blocks** — The blocks assigned to one SM at the same time. The count is the smallest of three limits: the hardware cap on blocks per SM, registers per SM divided by the block's register demand, and shared memory per SM divided by the block's shared memory demand.
+**Resident block-եր** — Մեկ SM-ին միաժամանակ վերագրված block-երը։ Քանակը երեք սահմանափակումից ամենափոքրն է՝ block-երի hardware-ային սահմանը մեկ SM-ում, մեկ SM-ի ռեգիստրները բաժանած block-ի ռեգիստրների պահանջի վրա, և մեկ SM-ի shared memory-ն բաժանած block-ի shared memory-ի պահանջի վրա։
 
-**Occupancy** — How many warps are resident on an SM at once relative to the maximum it could hold. Limited by whichever resource runs out first: registers per thread, shared memory per block, or the thread-count cap. It is a means to **latency hiding**, not a goal — returns flatten past roughly 50 percent, and coarsened kernels trade it away deliberately.
+**Occupancy** — Քանի warp է միաժամանակ resident մեկ SM-ի վրա՝ հարաբերած այն առավելագույնին, որ SM-ը կարող է պահել։ Սահմանափակում է այն ռեսուրսը, որն առաջինն է սպառվում՝ ռեգիստրներ մեկ thread-ում, shared memory մեկ block-ում, կամ thread-երի քանակի սահմանը։ Սա միջոց է **latency hiding**-ի համար, ոչ թե նպատակ. մոտավորապես 50 տոկոսից հետո շահույթը հարթվում է, իսկ thread coarsening-ը դիտմամբ իջեցնում է occupancy-ն՝ մեկ thread-ին ավելի շատ աշխատանք տալու դիմաց (Օր 6)։
 
-**`cudaOccupancyMaxActiveBlocksPerMultiprocessor`** — The runtime call returning how many blocks of a given kernel and block size will be resident per SM, without running the kernel.
+**`cudaOccupancyMaxActiveBlocksPerMultiprocessor`** — Runtime-ի կանչ, որը վերադարձնում է, թե տվյալ kernel-ի և block size-ի դեպքում քանի block կլինի resident մեկ SM-ում՝ առանց kernel-ը գործարկելու։
 
 ```c
 cudaError_t cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-    int        *numBlocks,        // out: resident blocks per SM
-    const void *func,             // the kernel symbol
-    int         blockSize,        // threads per block you intend to launch with
-    size_t      dynamicSMemSize); // dynamic shared memory per block in bytes, 0 if none
+    int        *numBlocks,        // ելք՝ resident block-երը մեկ SM-ում
+    const void *func,             // kernel-ի սիմվոլը
+    int         blockSize,        // thread-երը մեկ block-ում, որով մտադիր եք գործարկել
+    size_t      dynamicSMemSize); // dynamic shared memory-ն մեկ block-ում, բայթերով, 0՝ եթե չկա
 ```
 
-`func` is the kernel name itself; in C++ it decays to the function's address, so the call reads `cudaOccupancyMaxActiveBlocksPerMultiprocessor(&n, my_kernel, 256, 0)`. `dynamicSMemSize` is the third launch argument, `my_kernel<<<grid, block, smem>>>`, not the statically declared `__shared__` arrays — those the compiler already accounted for.
+`func`-ը հենց kernel-ի անունն է. C++-ում այն վերածվում է ֆունկցիայի հասցեի, ուստի կանչը գրվում է այսպես՝ `cudaOccupancyMaxActiveBlocksPerMultiprocessor(&n, my_kernel, 256, 0)`։ `dynamicSMemSize`-ը launch-ի երրորդ արգումենտն է՝ `my_kernel<<<grid, block, smem>>>`, ոչ թե ստատիկ հայտարարված `__shared__` զանգվածները. դրանք կոմպիլյատորն արդեն հաշվի է առել։
 
-What comes back is a block count, not a percentage. Occupancy is derived:
+Վերադառնում է block-երի քանակ, ոչ թե տոկոս։ Occupancy-ն ստացվում է դրանից․
 
 ```c
 int n;
@@ -79,56 +79,56 @@ CUDA_CHECK(cudaGetDeviceProperties(&p, 0));
 double occupancy = double(n * blockSize) / p.maxThreadsPerMultiProcessor;
 ```
 
-The answer is computed from the compiled kernel's register count and shared memory request against this device's limits. Nothing is launched, so it is an upper bound on residency, not a measurement: it says how many blocks *could* be resident, not how busy the SM actually was. The measurement is `sm__warps_active.avg.pct_of_peak_sustained_active` in Nsight Compute, and the two differ whenever blocks finish at different times or the grid is too small to fill the device.
+Պատասխանը հաշվվում է կոմպիլացված kernel-ի ռեգիստրների քանակից և shared memory-ի պահանջից՝ այս device-ի սահմանների դեմ։ Ոչինչ չի գործարկվում, ուստի սա residency-ի վերին սահմանն է, ոչ թե չափում. ասում է, թե քանի block **կարող էր** resident լինել, ոչ թե թե SM-ը իրականում որքան զբաղված էր։ Չափումը Nsight Compute-ի `sm__warps_active.avg.pct_of_peak_sustained_active`-ն է, և երկուսը տարբերվում են ամեն անգամ, երբ block-երն ավարտվում են տարբեր ժամանակ, կամ grid-ը շատ փոքր է device-ը լցնելու համար։
 
-Two companions:
+Երկու հարակից կանչ․
 
-- `cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags(..., unsigned int flags)` — same call with `cudaOccupancyDefault` for the normal behaviour, or `cudaOccupancyDisableCachingOverride` to suppress a platform-specific caching adjustment.
-- `cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, func, dynamicSMemSize, blockSizeLimit)` — the inverse question. Instead of scoring a block size you chose, it returns the block size with the best potential occupancy, and the smallest grid that reaches it. Useful as a starting point, not as an answer: best occupancy is not the same as fastest.
+- `cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags(..., unsigned int flags)` — նույն կանչը, `cudaOccupancyDefault`՝ սովորական վարքի համար, կամ `cudaOccupancyDisableCachingOverride`՝ platform-ից կախված caching-ի ճշգրտումը անջատելու համար։
+- `cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, func, dynamicSMemSize, blockSizeLimit)` — հակառակ հարցը։ Ձեր ընտրած block size-ը գնահատելու փոխարեն վերադարձնում է այն block size-ը, որը տալիս է լավագույն հնարավոր occupancy, և ամենափոքր grid-ը, որով դրան հասնում է։ Հարմար է որպես մեկնարկային կետ, ոչ թե որպես պատասխան. լավագույն occupancy-ն և ամենաարագը նույն բանը չեն։
 
-**Coalescing (memory coalescing)** — When the 32 lanes of a warp access consecutive addresses, the hardware serves them in a single 128-byte transaction instead of up to 32 separate ones. The property belongs to the warp, not the thread: what matters is the combined footprint of one instruction across all 32 lanes, not the pattern one thread traces over time.
+**Coalescing (memory coalescing)** — Երբ warp-ի 32 lane-երը դիմում են հաջորդական հասցեների, hardware-ը դրանք սպասարկում է մեկ 128-բայթանոց transaction-ով՝ մինչև 32 առանձինի փոխարեն։ Հատկությունը warp-ինն է, ոչ թե thread-ինը. կարևորը մեկ հրամանի ընդհանուր հետքն է 32 lane-երի վրայով, ոչ թե այն, թե մեկ thread-ը ժամանակի ընթացքում ինչ ճանապարհ է անցնում։
 
-**Grid-stride loop** — A launch pattern where a fixed number of threads each process several elements in a loop, striding by the total thread count, instead of sizing the grid to match the data. Correct for any input size without recomputing launch dimensions.
+**Grid-stride loop** — Գործարկման ձև, որտեղ ֆիքսված քանակով thread-երից ամեն մեկը ցիկլով մշակում է մի քանի տարր՝ քայլելով thread-երի ընդհանուր քանակով, grid-ը տվյալների չափին հարմարեցնելու փոխարեն։ Ճիշտ է մուտքի ցանկացած չափի համար՝ առանց launch-ի չափերը վերահաշվելու։
 
-## How a block is placed
-A block is assigned to one SM and stays there until it finishes. How many blocks fit on an SM at once is decided by three limits at the same time: registers per thread, shared memory per block, and the hardware cap on resident blocks. The lowest of the three wins. This is why block size is a hardware question, not a style question.
+## Ինչպես է block-ը տեղադրվում
+Block-ը վերագրվում է մեկ SM-ի և մնում այնտեղ մինչև ավարտը։ Թե քանի block է միաժամանակ տեղավորվում SM-ում, որոշվում է միաժամանակ երեք սահմանափակմամբ՝ ռեգիստրներ մեկ thread-ում, shared memory մեկ block-ում, և resident block-երի hardware-ային սահման։ Հաղթում է ամենացածրը։ Հենց դրա համար block size-ը hardware-ի հարց է, ոչ թե ճաշակի։
 
-## Visual
-![A grid of blocks, each block a 2D array of threads, with the global-index formula shown](thread_hierarchy.svg)
+## Պատկեր
+![Block-երի grid, ամեն block՝ thread-երի երկչափ զանգված, կողքին՝ global index-ի բանաձևը](thread_hierarchy.svg)
 
-A launch creates a grid of blocks, and each block is itself a 1D, 2D or 3D array of threads. `blockIdx` says which block a thread is in, `threadIdx` which slot inside that block. The formula in the diagram is the one reused in almost every kernel that follows.
+Launch-ը ստեղծում է block-երի grid, և ամեն block ինքը thread-երի մեկ-, երկ- կամ եռաչափ զանգված է։ `blockIdx`-ը ասում է, թե thread-ը որ block-ում է, `threadIdx`-ը՝ որ տեղում այդ block-ի ներսում։ Գծապատկերի բանաձևը կրկնվում է գրեթե ամեն հաջորդ kernel-ում։
 
-## Animated
-![The global-index formula evaluated for four threads across three blocks, each cycling through blockIdx.x, blockDim.x and threadIdx.x to a concrete number](thread_indexing.svg)
+## Անիմացիա
+![Global index-ի բանաձևը հաշվվում է չորս thread-ի համար երեք block-ի վրայով, ամեն մեկը blockIdx.x, blockDim.x և threadIdx.x-ից հասնում է կոնկրետ թվի](thread_indexing.svg)
 
-One formula, four concrete threads. It is always `blockIdx.x * blockDim.x + threadIdx.x`; only the block and thread values change.
+Մեկ բանաձև, չորս կոնկրետ thread։ Միշտ `blockIdx.x * blockDim.x + threadIdx.x` է. փոխվում են միայն block-ի և thread-ի արժեքները։
 
-![Four fixed threads sweeping a 16-element array in stride-4 iterations, each thread taking a different element every iteration](grid_stride_loop.svg)
+![Չորս ֆիքսված thread անցնում են 16 տարրանոց զանգվածով՝ 4 քայլով, ամեն կրկնությանը ամեն thread վերցնում է այլ տարր](grid_stride_loop.svg)
 
-Four threads cover sixteen elements in four iterations. Doubling the array to thirty-two gives eight iterations at the same launch configuration. This is the grid-stride loop of the hands-on task.
+Չորս thread չորս կրկնությամբ ծածկում է տասնվեց տարր։ Զանգվածը երեսուներկուսի հասցնելը տալիս է ութ կրկնություն՝ նույն launch configuration-ով։ Սա լաբորատոր առաջադրանքի grid-stride loop-ն է։
 
-## Resources
+## Գրականություն
 - [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 2. Programming Model · 5. Performance Guidelines
 - CUDA C++ Best Practices Guide — Occupancy, Coalesced Access to Global Memory
 
-## Hands-On Task
-Vector addition, then the same kernel extended to 2D indexing over two grayscale images.
+## Լաբորատոր առաջադրանք
+Վեկտորների գումարում, ապա նույն kernel-ը ընդլայնված 2D ինդեքսավորմամբ՝ երկու grayscale պատկերի վրա։
 
-## Self-Learning
-1. Implement 1D vector addition for several array sizes, with bounds checking for sizes that are not a multiple of the block size.
-2. Extend to 2D indexing and add two grayscale images pixel by pixel.
-3. Time block sizes of 32, 64, 128 and 256. Call `cudaOccupancyMaxActiveBlocksPerMultiprocessor` for each and note where the timings stop tracking the occupancy numbers.
-4. Implement the same kernel as a grid-stride loop. Verify it is still correct after increasing `n` far beyond `blocks * threads` without changing the launch configuration.
-5. Write two copy kernels, one indexed `blockIdx.x * blockDim.x + threadIdx.x` and one indexed `threadIdx.x * gridDim.x + blockIdx.x`. Both are correct. Measure both.
-6. For your chosen block size, compute by hand how many blocks are resident per SM, then confirm with the occupancy API.
+## Ինքնուրույն աշխատանք
+1. Իրականացնել 1D վեկտորների գումարում մի քանի չափի զանգվածների համար, սահմանների ստուգմամբ այն չափերի համար, որոնք block size-ի բազմապատիկ չեն։
+2. Ընդլայնել 2D ինդեքսավորմամբ և գումարել երկու grayscale պատկեր՝ պիքսել առ պիքսել։
+3. Չափել 32, 64, 128 և 256 block size-երը։ Ամեն մեկի համար կանչել `cudaOccupancyMaxActiveBlocksPerMultiprocessor` և նշել, թե որտեղից է չափված ժամանակը դադարում հետևել occupancy-ի թվերին։
+4. Իրականացնել նույն kernel-ը grid-stride loop-ով։ Ստուգել, որ այն ճիշտ է մնում `n`-ը `blocks * threads`-ից շատ ավելի մեծացնելուց հետո՝ առանց launch configuration-ը փոխելու։
+5. Գրել երկու copy kernel՝ մեկը `blockIdx.x * blockDim.x + threadIdx.x` ինդեքսավորմամբ, մյուսը՝ `threadIdx.x * gridDim.x + blockIdx.x`։ Երկուսն էլ ճիշտ են։ Չափել երկուսը։
+6. Ընտրած block size-ի համար ձեռքով հաշվել, թե քանի block է resident մեկ SM-ում, ապա ստուգել occupancy-ի API-ով։
 
-## Self-Check
-No answers given.
+## Ինքնաստուգում
+Պատասխանները տրված չեն։
 
-1. What goes wrong in the global-index formula if you omit `blockDim.x`?
-2. Why does a grid-stride loop stay correct when `n` doubles, while a one-thread-per-element kernel does not?
-3. Both index formulas in task 5 produce correct output. What measurement tells you which one to keep?
-4. You launch `<<<100, 256>>>` over 20,000 elements with bounds checking. How many threads do no work?
+1. Ի՞նչ է սխալ գնում global index-ի բանաձևում, եթե բաց թողնեք `blockDim.x`-ը։
+2. Ինչու՞ է grid-stride loop-ը ճիշտ մնում, երբ `n`-ը կրկնապատկվում է, իսկ մեկ thread մեկ տարրի kernel-ը՝ ոչ։
+3. 5-րդ առաջադրանքի երկու բանաձևն էլ ճիշտ արդյունք են տալիս։ Ո՞ր չափումն է ասում, թե որը պահել։
+4. Գործարկում եք `<<<100, 256>>>` 20 000 տարրի վրա՝ սահմանների ստուգմամբ։ Քանի՞ thread աշխատանք չի կատարում։
 
-## Code Template
-See [`template.cu`](template.cu).
+## Կոդի template
+Տես [`template.cu`](template.cu)։

@@ -1,96 +1,96 @@
-# Day 1: CUDA Programming Model and GPU Architecture
+# Օր 1. CUDA-ի ծրագրավորման մոդելը և GPU-ի ճարտարապետությունը
 
-## Objectives
-- Map the host/device split onto what you already know from MPI: two address spaces, explicit transfers, no coherence between them
-- Describe the CUDA programming model: kernels, threads, blocks, grids
-- Compile and run a `.cu` file with `nvcc`, and explain what nvcc produces (host object code, PTX, SASS)
-- Read your own GPU's real numbers — SM count, registers per SM, shared memory per SM, warp size, memory bus width — and use them for the rest of the course
-- Check every CUDA call, and explain why a kernel launch needs a different check than everything else
+## Նպատակներ
+- Հասկանալ host-ի և device-ի բաժանումը՝ հենվելով MPI-ի փորձի վրա։ Հիշողությունը երկու առանձին address space է, փոխանցումները գրվում են բացահայտ, coherence չի ապահովվում
+- Նկարագրել CUDA-ի ծրագրավորման մոդելը՝ kernel, thread, block, grid
+- Կոմպիլացնել և գործարկել `.cu` ֆայլ `nvcc`-ով։ Բացատրել, թե nvcc-ն ինչ է արտադրում՝ host-ի object code, PTX և SASS
+- Կարդալ սեփական GPU-ի իրական թվերը՝ SM-ների քանակը, մեկ SM-ի ռեգիստրներն ու shared memory-ն, warp size-ը, հիշողության bus width-ը։ Այս թվերը պետք են ամբողջ դասընթացի ընթացքում
+- Ստուգել CUDA-ի ամեն կանչը։ Բացատրել, թե ինչու է kernel-ի launch-ը պահանջում այլ ստուգում, քան մյուս կանչերը
 
-## Key Concepts
-- Host vs device; why a GPU is a throughput machine and a CPU is a latency machine
-- Kernels, threads, blocks, grids (overview only — detail on Day 2)
-- Streaming multiprocessor: registers, ALUs, SFUs, tensor cores, warp schedulers, load/store units
-- `nvcc`: host/device split, PTX vs SASS, virtual vs real architecture flags
-- Error checking: `CUDA_CHECK`, `CUDA_CHECK_LAST_ERROR`
-- `cudaGetDeviceProperties` and `report_device_capabilities()`
+## Հիմնական հասկացություններ
+- Host և device. ինչու է GPU-ն throughput մեքենա, իսկ CPU-ն՝ latency մեքենա
+- Kernel, thread, block, grid (միայն ակնարկ, մանրամասնը՝ Օր 2)
+- Streaming multiprocessor՝ ռեգիստրներ, ALU, SFU, tensor core, warp scheduler, load/store unit
+- `nvcc`՝ host-ի և device-ի բաժանում, PTX և SASS, virtual և real architecture-ի flag-եր
+- Սխալների ստուգում՝ `CUDA_CHECK`, `CUDA_CHECK_LAST_ERROR`
+- `cudaGetDeviceProperties` և `report_device_capabilities()`
 
-## Definitions
-**Host** — The CPU, as opposed to the **device** (GPU).
+## Սահմանումներ
+**Host** — CPU-ն, ի տարբերություն **device**-ի (GPU)։
 
-**Device** — The GPU, as opposed to the **host** (CPU). Has its own memory space (VRAM), reached over PCIe or NVLink.
+**Device** — GPU-ն, ի տարբերություն **host**-ի (CPU)։ Ունի իր հիշողությունը՝ VRAM, որին հասնում են PCIe-ով կամ NVLink-ով։
 
-**Throughput machine and latency machine** — A CPU spends area on caches, branch prediction and out-of-order execution to make one instruction stream fast, that is, to reduce latency. A GPU spends the same area on execution units and register file to keep many warps in flight, and tolerates latency instead of removing it.
+**Throughput մեքենա և latency մեքենա** — CPU-ն տարածք է ծախսում cache-երի, branch prediction-ի և out-of-order կատարման վրա, որպեսզի հրամանների մեկ հոսքն արագ լինի, այսինքն՝ latency-ն փոքրացնի։ GPU-ն նույն տարածքը ծախսում է execution unit-ների և register file-ի վրա, որպեսզի շատ warp պահի աշխատանքի մեջ։ Latency-ն հանելու փոխարեն այն հանդուրժում է։
 
-**Kernel** — A function marked `__global__`, launched from host code with `<<<grid, block>>>` syntax, executed by many threads in parallel on the device.
+**Kernel** — `__global__` նշված ֆունկցիա, որը host-ի կոդից գործարկվում է `<<<grid, block>>>` գրելաձևով և device-ի վրա կատարվում է շատ thread-երով զուգահեռ։
 
-**SM (Streaming Multiprocessor)** — A GPU's core compute unit; a modern GPU has dozens to over a hundred. Each block runs entirely on one SM. Real counts and limits for your GPU are in `report_device_capabilities()`.
+**SM (Streaming Multiprocessor)** — GPU-ի հաշվողական հիմնական միավորը։ Ժամանակակից GPU-ն ունի տասնյակից մինչև հարյուրից ավելի։ Ամեն block ամբողջությամբ մեկ SM-ի վրա է կատարվում։ Ձեր GPU-ի իրական քանակն ու սահմանները `report_device_capabilities()`-ում են։
 
-**Warp scheduler** — The SM unit that each cycle selects one eligible warp and issues its next instruction to the execution units. An SM has several.
+**Warp scheduler** — SM-ի միավոր, որն ամեն ցիկլ ընտրում է մեկ պատրաստ (eligible) warp և նրա հաջորդ հրամանն ուղարկում execution unit-ներին։ SM-ում մի քանիսն է լինում։
 
-**SFU (Special Function Unit)** — The SM units computing transcendental functions — sine, cosine, exponential, reciprocal, reciprocal square root — at lower throughput than the FP32 units.
+**SFU (Special Function Unit)** — SM-ի միավորներ, որոնք հաշվում են transcendental ֆունկցիաներ՝ սինուս, կոսինուս, էքսպոնենտ, հակադարձ, հակադարձ քառակուսի արմատ։ Throughput-ը FP32 միավորներից ցածր է։
 
-**Load/store unit** — The SM units that issue memory instructions and compute addresses for global, local and shared memory accesses.
+**Load/store unit** — SM-ի միավորներ, որոնք թողարկում են հիշողության հրամանները և հաշվում հասցեները global, local և shared memory-ի համար։
 
-**nvcc** — The CUDA compiler driver. It separates a `.cu` file into host and device code, compiles the device part itself, passes the host part to the system compiler, and links both into one binary.
+**nvcc** — CUDA-ի կոմպիլյատորի driver-ը։ `.cu` ֆայլը բաժանում է host-ի և device-ի կոդի, device-ի մասն ինքն է կոմպիլացնում, host-ի մասը տալիս է համակարգի կոմպիլյատորին, և երկուսը միացնում մեկ binary-ի մեջ։
 
-**PTX** — NVIDIA's virtual, forward-compatible GPU assembly language. nvcc compiles device code to PTX first; `ptxas` then assembles PTX into real machine code (**SASS**) for a specific architecture.
+**PTX** — NVIDIA-ի virtual GPU assembly-ն, որը համատեղելի է հետագա architecture-ների հետ։ nvcc-ն device-ի կոդը նախ PTX է դարձնում, ապա `ptxas`-ը PTX-ից հավաքում է կոնկրետ architecture-ի իրական մեքենայական կոդը՝ **SASS**։
 
-**SASS** — The real machine code (cubin) for one specific GPU architecture, assembled from PTX by `ptxas`.
+**SASS** — Մեկ կոնկրետ GPU architecture-ի իրական մեքենայական կոդը (cubin), որը `ptxas`-ը հավաքում է PTX-ից։
 
-**Virtual and real architecture** — `-arch=compute_XX` names the virtual architecture PTX is generated for; `-code=sm_XX` names the real architecture SASS is generated for. `-arch=sm_XX` sets both.
+**Virtual և real architecture** — `-arch=compute_XX`-ը նշում է virtual architecture-ը, որի համար PTX է գեներացվում, իսկ `-code=sm_XX`-ը՝ real architecture-ը, որի համար SASS է գեներացվում։ `-arch=sm_XX`-ը երկուսն էլ սահմանում է։
 
-**Fat binary** — The single executable nvcc produces, holding host machine code together with one or more device images (PTX, SASS, or both). At launch the driver picks a matching SASS image, or JIT-compiles the embedded PTX if none matches.
+**Fat binary** — nvcc-ի արտադրած միակ գործարկվող ֆայլը, որում host-ի մեքենայական կոդի կողքին կա device-ի մեկ կամ մի քանի պատկեր՝ PTX, SASS կամ երկուսը։ Գործարկման պահին driver-ը վերցնում է համապատասխան SASS-ը, իսկ եթե այդպիսին չկա, JIT-ով կոմպիլացնում է ներդրված PTX-ը։
 
-**Compute capability** — A version number, for example `8.6`, identifying a GPU's architecture generation and feature set. Written as `sm_XX` and `compute_XX` in nvcc flags.
+**Compute capability** — Տարբերակի համար, օրինակ `8.6`, որը նշում է GPU-ի architecture-ի սերունդը և հնարավորությունների հավաքածուն։ nvcc-ի flag-երում գրվում է `sm_XX` և `compute_XX` ձևով։
 
-**`cudaGetDeviceProperties`** — The API call returning a `cudaDeviceProp` structure with the device's SM count, warp size, per-SM register and shared memory limits, clock rates, memory bus width and compute capability. `report_device_capabilities()` in `common/device_info.h` prints it.
+**`cudaGetDeviceProperties`** — API-ի կանչ, որը վերադարձնում է `cudaDeviceProp` կառուցվածք՝ device-ի SM-ների քանակով, warp size-ով, մեկ SM-ի ռեգիստրների և shared memory-ի սահմաններով, clock-երով, հիշողության bus width-ով և compute capability-ով։ `common/device_info.h`-ի `report_device_capabilities()`-ը տպում է այն։
 
-## Note for this audience
-Participants already write OpenMP and MPI. Two contrasts are worth making explicitly and are the fastest way into the model:
+## Ծանոթագրություն այս լսարանի համար
+Մասնակիցներն արդեն գրում են OpenMP և MPI։ Երկու համեմատություն արժե բացահայտ անել. դրանք մոդելի մեջ մտնելու ամենակարճ ճանապարհն են։
 
-- **Against OpenMP.** An OpenMP thread is scheduled by the OS and owns a full context. A CUDA thread is one lane of a warp; 32 of them share one instruction stream. Divergence is therefore a hardware cost, not a scheduling cost.
-- **Against MPI.** Host and device memory are separate address spaces with explicit transfers, which is familiar. What is different is that the transfer cost is not a network cost but a PCIe or NVLink cost, and it is usually the first thing that limits a naive port.
+- **OpenMP-ի համեմատ։** OpenMP-ի thread-ը պլանավորում է օպերացիոն համակարգը, և այն ունի լրիվ սեփական context։ CUDA-ի thread-ը warp-ի մեկ lane-ն է, և 32-ը կիսում են հրամանների մեկ հոսք։ Ուստի divergence-ը hardware-ի գին է, ոչ թե պլանավորման։
+- **MPI-ի համեմատ։** Host-ի և device-ի հիշողությունները առանձին address space-եր են՝ բացահայտ փոխանցումներով, ինչը ծանոթ է։ Տարբերությունն այն է, որ փոխանցման գինը ցանցի գին չէ, այլ PCIe-ի կամ NVLink-ի։ Սովորաբար հենց դա է առաջին սահմանափակումը, երբ կոդը նոր է GPU տեղափոխվել։
 
-## Visual
-![Host (CPU, few fast cores, system RAM) connected over PCIe or NVLink to the device (GPU, many cores, VRAM)](host_device.svg)
+## Պատկեր
+![Host (CPU, քիչ բայց արագ core-եր, համակարգի RAM), միացած PCIe-ով կամ NVLink-ով device-ին (GPU, շատ core, VRAM)](host_device.svg)
 
-Host and device are two address spaces joined by one link. Allocation, transfer and launch all cross it. The driver is not drawn: it runs on the host side and is what turns a `cudaMemcpy` or a launch into traffic on that link and commands in the GPU's queue.
+Host-ը և device-ը երկու address space են՝ միացած մեկ կապով։ Հիշողության հատկացումը, փոխանցումը և launch-ը բոլորն անցնում են դրա վրայով։ Driver-ը նկարված չէ․ այն host-ի կողմում է և հենց այն է, որ `cudaMemcpy`-ը կամ launch-ը վերածում է այդ կապով անցնող տվյալների և GPU-ի հերթում դրվող հրամանների։
 
-## Animated
-![Data moving from host RAM to device VRAM over the link, then a kernel launch, then the result moving back](host_device_transfer.svg)
+## Անիմացիա
+![Տվյալները host-ի RAM-ից անցնում են device-ի VRAM, ապա kernel-ի launch, ապա արդյունքը վերադառնում է](host_device_transfer.svg)
 
-The cycle of a typical CUDA program: copy in, launch, copy out. The two copy legs are long relative to the launch itself. Days 4, 6 and 8 deal with that asymmetry.
+Սովորական CUDA ծրագրի ցիկլը՝ copy in, launch, copy out։ Երկու copy-ն երկար են launch-ի համեմատ։ Օրեր 4, 6 և 8-ը հենց այդ անհամաչափության մասին են։
 
-![A .cu file splitting into a device path (nvcc frontend, PTX, ptxas, SASS/cubin) and a host path (host compiler), the two joined at the linker into one binary](nvcc_toolchain.svg)
+![`.cu` ֆայլը բաժանվում է device-ի ճանապարհի (nvcc-ի frontend, PTX, ptxas, SASS/cubin) և host-ի ճանապարհի (host-ի կոմպիլյատոր), որոնք linker-ում միանում են մեկ binary-ի](nvcc_toolchain.svg)
 
-The device path takes four steps before machine code exists; the host path takes two and then waits at the linker, because the binary cannot be assembled until both halves are there. PTX is where the virtual architecture is fixed, SASS where the real one is.
+Device-ի ճանապարհը չորս քայլ է մինչև մեքենայական կոդի հայտնվելը, host-ինը՝ երկու, ապա սպասում է linker-ին, որովհետև binary-ն չի հավաքվի, քանի դեռ երկու կեսն էլ պատրաստ չեն։ PTX-ում է ամրագրվում virtual architecture-ը, SASS-ում՝ real-ը։
 
-## Resources
+## Գրականություն
 - [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 2. Programming Model · 4. Hardware Implementation · 16. Compute Capabilities
 - CUDA C++ Best Practices Guide — Assess, Parallelize, Optimize, Deploy
-- SM anatomy diagram and animations: [`sm_anatomy.svg`](../sm_anatomy.svg), [`sm_animations.html`](../sm_animations.html)
-- [`ARCHITECTURE.md`](../ARCHITECTURE.md) — what is inside an SM, in detail
+- SM-ի կառուցվածքի գծապատկերը և անիմացիաները՝ [`sm_anatomy.svg`](../sm_anatomy.svg), [`sm_animations.html`](../sm_animations.html)
+- [`ARCHITECTURE.md`](../ARCHITECTURE.md) — ինչ կա SM-ի ներսում, մանրամասն
 
-## Hands-On Task
-Run `report_device_capabilities()` on the cluster GPU and write down the numbers. Then write and launch a minimal kernel that reports its own block and thread index. The goal is a clean compile-and-run cycle plus a record of the hardware you will be measuring against all course.
+## Լաբորատոր առաջադրանք
+Գործարկել `report_device_capabilities()`-ը կլաստերի GPU-ի վրա և գրել թվերը։ Ապա գրել և գործարկել նվազագույն kernel, որը տպում է իր block-ի և thread-ի index-ը։ Նպատակը մաքուր կոմպիլացիա-գործարկում ցիկլն է, և այն hardware-ի թվերի գրանցումը, որի դեմ չափվելու է ամբողջ դասընթացը։
 
-## Self-Learning
-1. Print `Hello from block X, thread Y` with device-side `printf`, launched as `<<<1,1>>>`, `<<<2,4>>>`, `<<<4,32>>>`.
-2. Have each thread write its raw `blockIdx.x` and `threadIdx.x` into two arrays; copy back and verify against the launch configuration.
-3. From `report_device_capabilities()` output, compute the theoretical peak FP32 throughput and peak memory bandwidth of the cluster GPU. Compare with NVIDIA's published figures and account for the difference.
-4. Compile the same kernel with `-arch=sm_75` and with `-arch=sm_90`; dump SASS for both with `cuobjdump --dump-sass` and diff the output.
-5. Launch with 5000 threads per block once without `CUDA_CHECK_LAST_ERROR()` and once with it. Note what each run tells you.
+## Ինքնուրույն աշխատանք
+1. Տպել `Hello from block X, thread Y` device-ի `printf`-ով, գործարկելով `<<<1,1>>>`, `<<<2,4>>>` և `<<<4,32>>>` կոնֆիգուրացիաներով։
+2. Ամեն thread-ով գրել իր `blockIdx.x`-ը և `threadIdx.x`-ը երկու զանգվածի մեջ, պատճենել host և ստուգել launch configuration-ի դեմ։
+3. `report_device_capabilities()`-ի ելքից հաշվել կլաստերի GPU-ի տեսական peak FP32 throughput-ը և peak memory bandwidth-ը։ Համեմատել NVIDIA-ի հրապարակած թվերի հետ և բացատրել տարբերությունը։
+4. Կոմպիլացնել նույն kernel-ը `-arch=sm_75`-ով և `-arch=sm_90`-ով, երկուսի SASS-ը հանել `cuobjdump --dump-sass`-ով և diff անել։
+5. Գործարկել 5000 thread մեկ block-ում՝ մեկ անգամ առանց `CUDA_CHECK_LAST_ERROR()`-ի, մեկ անգամ դրանով։ Նշել, թե ամեն գործարկումն ինչ է ցույց տալիս։
 
-## Self-Check
-No answers given.
+## Ինքնաստուգում
+Պատասխանները տրված չեն։
 
-1. Why can a kernel launch not return a `cudaError_t` the way `cudaMalloc` does?
-2. Why does nvcc emit PTX before machine code, and what does that buy you when the cluster is upgraded?
-3. Your GPU reports N SMs and a peak bandwidth of B GB/s. Which of the two numbers will limit a vector addition, and how do you know before running it?
-4. An OpenMP thread and a CUDA thread are both called "thread". Name two properties that do not carry over.
+1. Ինչու՞ kernel-ի launch-ը չի կարող `cudaError_t` վերադարձնել այնպես, ինչպես `cudaMalloc`-ը։
+2. Ինչու՞ է nvcc-ն մեքենայական կոդից առաջ PTX արտադրում, և ի՞նչ է դա տալիս, երբ կլաստերը թարմացվում է։
+3. Ձեր GPU-ն հայտնում է N SM և peak bandwidth B GB/s։ Այս երկուսից ո՞րն է սահմանափակելու վեկտորների գումարումը, և ինչպե՞ս եք դա իմանում մինչև գործարկելը։
+4. OpenMP-ի thread-ը և CUDA-ի thread-ը երկուսն էլ «thread» են կոչվում։ Նշել երկու հատկություն, որոնք չեն փոխանցվում։
 
-## Code Template
-See [`template.cu`](template.cu).
+## Կոդի template
+Տես [`template.cu`](template.cu)։
 
-Worked example: [`example.md`](example.md) — the same kernel followed from C++ through PTX to SASS, with real compiler output, and how to embed PTX in device code.
+Մանրամասն օրինակ՝ [`example.md`](example.md) — նույն kernel-ը հետևված C++-ից PTX, ապա SASS, իրական կոմպիլյատորի ելքով, և ինչպես PTX ներդնել device-ի կոդի մեջ։

@@ -1,88 +1,88 @@
-# Day 3: SIMT Execution, Warps, Divergence and Latency Hiding
+# Օր 3. SIMT կատարումը, warp-երը, divergence-ը և latency hiding-ը
 
-## Objectives
-- Explain SIMT: one instruction fetched and decoded once, issued to 32 lanes
-- Describe the instruction pipeline and why register read and memory are separate stages
-- Explain how the warp scheduler hides latency by switching between resident warps, and why this replaces the large caches a CPU uses
-- Recognise and avoid branch divergence; explain why it serialises rather than parallelises
-- Apply loop unrolling where it helps
+## Նպատակներ
+- Բացատրել SIMT-ը՝ մեկ հրաման, որ մեկ անգամ է կարդացվում ու վերծանվում և ուղարկվում 32 lane-երի
+- Նկարագրել հրամանների pipeline-ը և բացատրել, թե ինչու են register read-ը և memory-ն առանձին փուլեր
+- Բացատրել, թե ինչպես է warp scheduler-ը թաքցնում latency-ն՝ անցնելով resident warp-երի միջև, և ինչու է դա փոխարինում այն մեծ cache-երին, որ CPU-ն ունի
+- Ճանաչել և խուսափել branch divergence-ից. բացատրել, թե ինչու է այն սերիականացնում, ոչ թե զուգահեռացնում
+- Կիրառել loop unrolling այնտեղ, որտեղ օգուտ է տալիս
 
-## Key Concepts
-- SIMT and the instruction pipeline: fetch, decode, warp scheduler, one instruction issued to all 32 lanes
-- Warp formation from `threadIdx`; why block sizes that are not multiples of 32 waste lanes
-- Eligible, active and stalled warps; what a stall reason means in a profiler
-- Branch divergence and reconvergence
+## Հիմնական հասկացություններ
+- SIMT և հրամանների pipeline՝ fetch, decode, warp scheduler, մեկ հրաման՝ ուղարկված բոլոր 32 lane-երին
+- Warp-ի ձևավորումը `threadIdx`-ից. ինչու են 32-ի բազմապատիկ չհանդիսացող block size-երը lane-եր վատնում
+- Eligible, active և stalled warp-եր. ինչ է նշանակում stall reason-ը profiler-ում
+- Branch divergence և reconvergence
 - Loop unrolling
 
-## Definitions
-**Warp** — A group of 32 threads within a block that the hardware schedules and executes together: one instruction is issued to all 32 at the same time, so at any moment they are on the same instruction. The unit warp-level intrinsics operate on.
+## Սահմանումներ
+**Warp** — Block-ի ներսում 32 thread-ից բաղկացած խումբ, որը hardware-ը պլանավորում և կատարում է միասին. մեկ հրաման միաժամանակ ուղարկվում է բոլոր 32-ին, ուստի ցանկացած պահի բոլորը նույն հրամանի վրա են։ Warp մակարդակի intrinsic-ները հենց այս միավորի վրա են աշխատում։
 
-**SIMT (Single Instruction, Multiple Threads)** — NVIDIA's execution model: one instruction is fetched and decoded once and issued to all 32 threads of a warp at the same time.
+**SIMT (Single Instruction, Multiple Threads)** — NVIDIA-ի կատարման մոդելը՝ մեկ հրաման մեկ անգամ է կարդացվում ու վերծանվում և միաժամանակ ուղարկվում warp-ի բոլոր 32 thread-երին։
 
-**Instruction pipeline** — The stages an instruction passes through: fetch, decode, register read, execute, memory, writeback. Several instructions are in flight at once, one per stage.
+**Հրամանների pipeline** — Փուլերը, որոնցով անցնում է հրամանը՝ fetch, decode, register read, execute, memory, writeback։ Միաժամանակ մի քանի հրաման է շարժման մեջ՝ մեկը ամեն փուլում։
 
-**Register file** — The per-SM storage from which every thread's registers are allocated. Its size is fixed, so registers per thread and resident warps trade against each other.
+**Register file** — Մեկ SM-ի պահոց, որից հատկացվում են բոլոր thread-երի ռեգիստրները։ Չափը ֆիքսված է, ուստի մեկ thread-ի ռեգիստրները և resident warp-երի քանակը մրցում են միմյանց հետ։
 
-**Eligible, active and stalled warp** — An active, that is resident, warp occupies a warp slot on the SM. It is eligible when it is ready to issue: its next instruction has been decoded, every value that instruction reads is available — any earlier load it depends on has returned — and the unit that will execute it, the FP32 pipe, the load/store unit or a tensor core, is free this cycle. Otherwise the warp is stalled. Each cycle the scheduler picks one warp to issue from, and only eligible warps are candidates.
+**Eligible, active և stalled warp** — Active, այսինքն՝ resident warp-ը զբաղեցնում է SM-ի warp slot։ Այն **eligible** է՝ պատրաստ, երբ կարող է ուղարկել հաջորդ հրամանը։ Դրա համար երեք պայման է պետք․ հրամանն արդեն վերծանված է, նրա կարդացած բոլոր արժեքները հասանելի են, այսինքն՝ նախորդ load-ը, որից այն կախված է, վերադարձել է, և այն կատարող սարքը՝ FP32 pipe-ը, load/store unit-ը կամ tensor core-ը, այդ ցիկլում ազատ է։ Հակառակ դեպքում warp-ը stalled է։ Ամեն ցիկլ scheduler-ը ընտրում է մեկ warp, որից ուղարկի, և թեկնածու են միայն պատրաստ warp-երը։
 
-**Stall reason** — The profiler's classification of why a warp was not eligible. NVIDIA groups them as waiting on an instruction fetch, a memory dependency, an execution dependency or a synchronisation barrier. It names what to fix.
+**Stall reason** — Profiler-ի դասակարգումը, թե ինչու warp-ը պատրաստ չէր։ NVIDIA-ն առանձնացնում է չորս խումբ՝ warp-ը սպասում է հրամանի կարդացմանը (instruction fetch), հիշողության կախվածությանը (memory dependency), կատարման կախվածությանը (execution dependency) կամ սինխրոնացման barrier-ին։ Հենց այն է անվանում, ինչ պետք է ուղղել։
 
-**Latency hiding** — The GPU's performance strategy: when one warp stalls, the warp scheduler issues an instruction from a different, ready warp in the same cycle instead of leaving the pipeline idle. The reason GPUs favour many threads over few fast ones.
+**Latency hiding** — GPU-ի արագագործության ռազմավարությունը. երբ warp-ը կանգ է առնում, warp scheduler-ը նույն ցիկլում ուղարկում է այլ, պատրաստ warp-ի հրամանը՝ pipeline-ը պարապ թողնելու փոխարեն։ Հենց դրա համար GPU-ն նախընտրում է շատ thread, ոչ թե քիչ ու արագ։
 
-**Divergence (warp divergence)** — When threads within one warp take different paths through a branch. Because the 32 threads share one instruction stream, the hardware runs each path separately with some lanes masked off, instead of in parallel.
+**Divergence (warp divergence)** — Երբ մեկ warp-ի thread-երը branch-ում տարբեր ճանապարհներ են ընտրում։ Քանի որ 32 thread-ը կիսում են հրամանների մեկ հոսք, hardware-ը ամեն ճանապարհ առանձին է անցնում՝ մի մասի lane-երը փակելով, զուգահեռ կատարելու փոխարեն։
 
-**Reconvergence** — The point after a divergent branch where all lanes of the warp execute the same instruction again. From Volta on, lanes have independent program counters and reconvergence at the end of a branch is not guaranteed; `__syncwarp` makes it explicit.
+**Reconvergence** — Divergent branch-ից հետո այն կետը, որտեղ warp-ի բոլոր lane-երը նորից նույն հրամանն են կատարում։ Volta-ից սկսած lane-երն ունեն անկախ program counter, և branch-ի վերջում reconvergence-ը երաշխավորված չէ. `__syncwarp`-ը այն դարձնում է բացահայտ։
 
-**Loop unrolling** — Replacing a loop by repeated copies of its body, which removes branch and index instructions and exposes independent operations to the scheduler. `#pragma unroll` controls it.
+**Loop unrolling** — Ցիկլը փոխարինել իր մարմնի կրկնվող պատճեններով, ինչը հեռացնում է branch-ի ու ինդեքսի հրամանները և scheduler-ին բացում անկախ գործողություններ։ Կառավարվում է `#pragma unroll`-ով։
 
-## Why latency hiding is the centre of the architecture
-A CPU reduces memory latency with deep cache hierarchies and speculation. A GPU largely does not: it tolerates the latency instead. When a warp stalls on a load, the scheduler issues an instruction from another resident warp in the same cycle. This single decision explains occupancy, why block size matters, why divergence is expensive, and why arithmetic intensity determines performance. Everything later in the course is a consequence of it.
+## Ինչու է latency hiding-ը ճարտարապետության կենտրոնում
+CPU-ն հիշողության latency-ն փոքրացնում է խորը cache-երի հիերարխիայով և speculation-ով։ GPU-ն հիմնականում դա չի անում՝ փոխարենը հանդուրժում է latency-ն։ Երբ warp-ը կանգ է առնում load-ի վրա, scheduler-ը նույն ցիկլում ուղարկում է այլ resident warp-ի հրամանը։ Այս մեկ որոշումը բացատրում է occupancy-ն, block size-ի կարևորությունը, divergence-ի բարձր գինը և այն, թե ինչու է arithmetic intensity-ն որոշում արագագործությունը։ Դասընթացի մնացած ամեն ինչը դրա հետևանքն է։
 
-## Visual
-![SIMT instruction pipeline: fetch, decode, warp scheduler, then one instruction issued at once to all 32 lanes of a warp](pipeline.svg)
+## Պատկեր
+![SIMT-ի հրամանների pipeline՝ fetch, decode, warp scheduler, ապա մեկ հրաման՝ ուղարկված միաժամանակ warp-ի բոլոր 32 lane-երին](pipeline.svg)
 
-One instruction is fetched and decoded once, then issued to all 32 threads of a warp at the same time. This is the reason divergence costs: when lanes disagree on a branch the hardware masks lanes off and runs each path in turn.
+Մեկ հրաման մեկ անգամ է կարդացվում ու վերծանվում, ապա միաժամանակ ուղարկվում warp-ի բոլոր 32 thread-երին։ Հենց սա է divergence-ի գնի պատճառը. երբ lane-երը branch-ում համաձայն չեն, hardware-ը փակում է lane-երի մի մասը և ամեն ճանապարհ անցնում հերթով։
 
-![A six-stage pipeline — fetch, decode, register read, execute, memory, writeback — with four instructions in flight, each one stage behind the previous](pipeline_timeline.svg)
+## Անիմացիա
+![Վեց փուլանոց pipeline՝ fetch, decode, register read, execute, memory, writeback, չորս հրաման շարժման մեջ, ամեն մեկը նախորդից մեկ փուլ հետ](pipeline_timeline.svg)
 
-The same pipeline seen over time. Register read and memory are separate stages because the register file and global memory are both limited resources with real access latency. When a warp stalls in the memory stage, the scheduler issues an instruction from a different warp in that cycle rather than leaving the stage idle.
+Նույն pipeline-ը՝ ժամանակի մեջ։ Register read-ը և memory-ն առանձին փուլեր են, որովհետև և՛ register file-ը, և՛ global memory-ն սահմանափակ ռեսուրսներ են՝ իրական դիմումի latency-ով։ Երբ warp-ը կանգ է առնում memory փուլում, scheduler-ը այդ ցիկլում ուղարկում է այլ warp-ի հրաման՝ փուլը պարապ թողնելու փոխարեն։
 
-## Animated
-![A warp scheduler cycling through six resident warps: a token travels to the scheduler and on to the execution units, and a new warp is issued as soon as one goes idle](warp_scheduling.svg)
+![Warp scheduler-ը շրջանցում է վեց resident warp. token-ը գնում է scheduler, ապա execution unit-ներ, և հենց մեկը պարապում է, ուղարկվում է նորը](warp_scheduling.svg)
 
-As soon as one warp becomes not ready, another resident warp takes its place. This is latency hiding, and occupancy is the measure of how much of it is available.
+Հենց մի warp դադարում է պատրաստ լինելուց, նրա տեղը զբաղեցնում է մյուս resident warp-ը։ Սա է latency hiding-ը, և occupancy-ն չափում է, թե որքան է դրանից հասանելի։
 
-![A 32-thread warp splitting on a branch: threads 0-15 execute path A while 16-31 are masked off, then the reverse, then all 32 reconverge](warp_divergence.svg)
+![32 thread-անոց warp-ը բաժանվում է branch-ի վրա. thread 0–15-ը անցնում են A ճանապարհով, 16–31-ը փակ են, ապա հակառակը, ապա բոլոր 32-ը վերամիավորվում են](warp_divergence.svg)
 
-The two paths run one after the other. Divergence serialises a warp; it does not add parallelism.
+Երկու ճանապարհն անցնում է հերթով։ Divergence-ը սերիականացնում է warp-ը, զուգահեռություն չի ավելացնում։
 
-A steppable version is in [`warp_animations.html`](warp_animations.html). Open it locally in a browser — GitHub's file viewer shows HTML as source rather than running it.
+Քայլ առ քայլ տարբերակը՝ [`warp_animations.html`](warp_animations.html)։ Բացել տեղում, browser-ով. GitHub-ի դիտիչը HTML-ը ցույց է տալիս որպես տեքստ, չի գործարկում։
 
-## Resources
+## Գրականություն
 - [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 4. Hardware Implementation · 5. Performance Guidelines
-- [Nsight Compute Kernel Profiling Guide](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html) — 2.3.1. Hardware Model: the source of the active, eligible and stalled warp states used above
-- Oxford CUDA course, lecture 3: https://people.maths.ox.ac.uk/~gilesm/cuda/lecs/lec3.pdf
+- [Nsight Compute Kernel Profiling Guide](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html) — 2.3.1. Hardware Model. Այստեղից են վերևում օգտագործված active, eligible և stalled warp վիճակները
+- Oxford-ի CUDA դասընթաց, lecture 3: https://people.maths.ox.ac.uk/~gilesm/cuda/lecs/lec3.pdf
 - Using CUDA warp-level primitives: https://developer.nvidia.com/blog/using-cuda-warp-level-primitives/
-- Pipeline and warp scheduling diagrams: see `Visual` and `Animated` above; interactive version in [`warp_animations.html`](warp_animations.html)
+- Pipeline-ի և warp scheduling-ի գծապատկերները՝ վերևի `Պատկեր` և `Անիմացիա` բաժիններում. ինտերակտիվ տարբերակը՝ [`warp_animations.html`](warp_animations.html)
 
-## Hands-On Task
-Vector addition timed against an equivalent CPU loop, then a BGR to grayscale conversion kernel.
+## Լաբորատոր առաջադրանք
+Վեկտորների գումարում՝ ժամանակով համեմատված համարժեք CPU ցիկլի հետ, ապա BGR-ից grayscale փոխակերպման kernel։
 
-## Self-Learning
-1. Implement and time vector addition against a CPU loop.
-2. Convert BGR to grayscale in a kernel (`gray = 0.114*B + 0.587*G + 0.299*R`).
-3. Introduce divergence deliberately (`if (threadIdx.x % 2 == 0)`) and measure the cost against a divergence-free version.
-4. Repeat task 3 with the branch taken on `threadIdx.x / 32` instead. Explain the difference in result.
-5. Apply `#pragma unroll` to a small fixed-trip-count loop and compare the generated SASS as well as the timing.
+## Ինքնուրույն աշխատանք
+1. Իրականացնել և չափել վեկտորների գումարումը CPU ցիկլի դեմ։
+2. Kernel-ում BGR-ը դարձնել grayscale (`gray = 0.114*B + 0.587*G + 0.299*R`)։
+3. Դիտմամբ ներմուծել divergence (`if (threadIdx.x % 2 == 0)`) և չափել գինը՝ առանց divergence-ի տարբերակի դեմ։
+4. Կրկնել 3-րդ առաջադրանքը, բայց branch-ը կառուցել `threadIdx.x / 32`-ի վրա։ Բացատրել արդյունքի տարբերությունը։
+5. Կիրառել `#pragma unroll` փոքր, ֆիքսված քանակով կրկնությունների ցիկլի վրա և համեմատել ոչ միայն ժամանակը, այլև գեներացված SASS-ը։
 
-## Self-Check
-No answers given.
+## Ինքնաստուգում
+Պատասխանները տրված չեն։
 
-1. Why is divergence expensive even though every thread eventually does its useful work?
-2. Why are register read and memory separate pipeline stages rather than folded into execute?
-3. Half a warp takes the `if`, half the `else`. How does that warp's execution time compare with a divergence-free warp doing the same total work?
-4. Task 4 branches on `threadIdx.x / 32` and costs nothing. Why?
-5. If latency hiding depends on having other warps ready, what happens to a kernel that uses so many registers that only one warp is resident?
+1. Ինչու՞ է divergence-ը թանկ, եթե ամեն thread ի վերջո կատարում է իր օգտակար աշխատանքը։
+2. Ինչու՞ են register read-ը և memory-ն առանձին pipeline փուլեր, ոչ թե execute-ի մեջ միացված։
+3. Warp-ի կեսը գնում է `if`-ով, կեսը՝ `else`-ով։ Ինչպե՞ս է այդ warp-ի կատարման ժամանակը համեմատվում առանց divergence-ի warp-ի հետ, որ նույն ծավալի աշխատանք է անում։
+4. 4-րդ առաջադրանքի branch-ը `threadIdx.x / 32`-ի վրա է և ոչինչ չի արժենում։ Ինչու՞։
+5. Եթե latency hiding-ը կախված է ուրիշ պատրաստ warp-երի առկայությունից, ի՞նչ է լինում այն kernel-ի հետ, որն այնքան ռեգիստր է օգտագործում, որ ընդամենը մեկ warp է resident։
 
-## Code Template
-See [`template.cu`](template.cu).
+## Կոդի template
+Տես [`template.cu`](template.cu)։

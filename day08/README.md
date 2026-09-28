@@ -1,80 +1,80 @@
-# Day 8: Streams, Events, Asynchrony and CUDA Graphs
+# Օր 8. Stream-եր, event-ներ, ասինխրոնություն և CUDA graph-եր
 
-## Objectives
-- Distinguish synchronous and asynchronous `cudaMemcpy` and explain when the async form silently becomes synchronous
-- Overlap transfer with computation across streams, and confirm the overlap with events and Nsight Systems
-- Time on the device with events rather than on the host
-- Capture a sequence of operations into a CUDA graph, and say when graph launch pays off
+## Նպատակներ
+- Տարբերել սինխրոն և ասինխրոն `cudaMemcpy`-ը, և բացատրել, թե երբ է ասինխրոն ձևը աննկատ դառնում սինխրոն
+- Stream-երի միջոցով փոխանցումը համատեղել հաշվարկի հետ, և համատեղումը ստուգել event-ներով և Nsight Systems-ով
+- Ժամանակը չափել device-ի վրա event-ներով, ոչ թե host-ի վրա
+- Գործողությունների հաջորդականությունը գրանցել CUDA graph-ի մեջ, և ասել, թե երբ է graph-ով գործարկումը արդարացված
 
-## Key Concepts
-- Default stream semantics and why it serialises independent work
-- `cudaMemcpyAsync`, stream dependencies, and the pinned-memory requirement
-- Events: `cudaEventCreate`, `cudaEventRecord`, `cudaEventSynchronize`, `cudaEventElapsedTime`
-- Chunked pipelines: copy, compute and copy-back in flight at once
-- Graph capture, instantiation and launch; launch overhead amortisation
+## Հիմնական հասկացություններ
+- Default stream-ի կանոնները, և ինչու է այն սերիականացնում անկախ աշխատանքը
+- `cudaMemcpyAsync`, stream-երի միջև կախվածություններ, և pinned հիշողության պահանջը
+- Event-ներ՝ `cudaEventCreate`, `cudaEventRecord`, `cudaEventSynchronize`, `cudaEventElapsedTime`
+- Մասերով pipeline՝ պատճենում, հաշվարկ և հետ պատճենում՝ միաժամանակ ընթացքի մեջ
+- Graph-ի capture, instantiation և launch. launch overhead-ի բաշխում
 
-## Definitions
-**Stream** — An ordered queue of GPU operations, kernels and copies. Operations in different streams may run concurrently; operations within one stream execute in issue order.
+## Սահմանումներ
+**Stream** — GPU-ի գործողությունների՝ kernel-ների և պատճենումների, կարգավորված հերթ։ Տարբեր stream-երի գործողությունները կարող են կատարվել միաժամանակ։ Մեկ stream-ի ներսում գործողությունները կատարվում են ուղարկման հերթականությամբ։
 
-**Default stream (per-thread)** — The stream used when none is named. Compiled with `--default-stream per-thread`, each host thread gets its own default stream, which does not serialise against other streams.
+**Default stream (per-thread)** — Այն stream-ը, որն օգտագործվում է, երբ ոչ մեկը նշված չէ։ `--default-stream per-thread`-ով կոմպիլացնելիս host-ի ամեն thread ստանում է իր սեփական default stream-ը, որը մյուս stream-երի հետ չի սերիականացվում։
 
-**`cudaMemcpyAsync`** — A copy issued into a stream, returning immediately. It is genuinely asynchronous only when the host memory is page-locked; with pageable memory the runtime falls back to a synchronous copy and does not report it.
+**`cudaMemcpyAsync`** — Stream-ի մեջ ուղարկված պատճենում, որը վերադառնում է անմիջապես։ Իսկապես ասինխրոն է միայն այն դեպքում, երբ host-ի հիշողությունը page-locked է։ Pageable հիշողության դեպքում runtime-ը անցնում է սինխրոն պատճենման և այդ մասին չի հայտնում։
 
-**Event** — A marker placed in a stream with `cudaEventRecord`, which completes when all work preceding it in that stream completes. Used to wait, `cudaEventSynchronize`, and to measure, `cudaEventElapsedTime`.
+**Event** — `cudaEventRecord`-ով stream-ում դրված նշան, որն ավարտվում է, երբ այդ stream-ում իրենից առաջ եղած ամբողջ աշխատանքն ավարտվում է։ Օգտագործվում է սպասելու համար՝ `cudaEventSynchronize`, և չափելու համար՝ `cudaEventElapsedTime`։
 
-**Stream dependency** — Ordering between streams, expressed by recording an event in one and having another wait on it with `cudaStreamWaitEvent`.
+**Stream-երի կախվածություն** — Stream-երի միջև հերթականություն, որ արտահայտվում է այսպես․ մեկ stream-ում event է գրանցվում, իսկ մյուսը սպասում է դրան `cudaStreamWaitEvent`-ով։
 
-**Device-side timing** — Measuring with events rather than a host clock, so the interval measured is the GPU's and excludes host-side launch latency.
+**Device-ի կողմից ժամանակաչափում** — Չափել event-ներով, ոչ թե host-ի ժամացույցով, որպեսզի չափված միջակայքը GPU-ինը լինի և չներառի host-ի կողմից launch-ի ուշացումը։
 
-**Double buffering** — Splitting the input into chunks and using two or more sets of buffers and streams, so that while chunk n is computed, chunk n+1 is copied in and chunk n-1 copied out. The ceiling becomes the larger of the transfer and compute rates rather than their sum.
+**Double buffering** — Մուտքը բաժանել մասերի և օգտագործել բուֆերների ու stream-երի երկու կամ ավելի հավաքածու, որպեսզի n-րդ մասը հաշվելու ընթացքում n+1-րդը պատճենվի device, իսկ n-1-րդը՝ հետ։ Առաստաղը դառնում է փոխանցման և հաշվարկի արագություններից մեծագույնը, ոչ թե դրանց գումարը։
 
-**CUDA graph** — A recorded directed acyclic graph of operations — kernels, copies, host callbacks — together with their dependencies, launched as one unit.
+**CUDA graph** — Գործողությունների՝ kernel-ների, պատճենումների, host callback-ների, և դրանց կախվածությունների գրանցված ուղղորդված ացիկլիկ գրաֆ, որը գործարկվում է որպես մեկ միավոր։
 
-**Graph capture** — Recording a sequence of stream operations into a graph instead of executing it, between `cudaStreamBeginCapture` and `cudaStreamEndCapture`.
+**Graph capture** — Stream-ի գործողությունների հաջորդականությունը կատարելու փոխարեն գրանցել graph-ի մեջ՝ `cudaStreamBeginCapture`-ի և `cudaStreamEndCapture`-ի միջև։
 
-**Instantiation** — Turning a captured graph into an executable graph with `cudaGraphInstantiate`. Done once; the work of validating and preparing the launches is paid here instead of at every launch.
+**Instantiation** — Գրանցված graph-ը դարձնել գործարկվող graph՝ `cudaGraphInstantiate`-ով։ Արվում է մեկ անգամ. launch-երի ստուգման և նախապատրաստման աշխատանքը վճարվում է այստեղ, ոչ թե ամեն գործարկման ժամանակ։
 
-**Launch overhead** — The host-side cost of issuing one kernel launch. It is what graphs remove, and it matters when a fixed sequence of short kernels runs many times.
+**Launch overhead** — Մեկ kernel-ի launch ուղարկելու ծախսը host-ի կողմից։ Հենց սա է graph-ը վերացնում, և դա կարևոր է, երբ կարճ kernel-ների ֆիքսված հաջորդականությունը շատ անգամ է կատարվում։
 
-## Where this connects to Day 4
-Day 4 established that the link is often the limit. Streams are the answer: while chunk *n* is computed, chunk *n+1* is being copied in and chunk *n-1* copied out. The ceiling is then the larger of the two rates, not their sum.
+## Կապը Օր 4-ի հետ
+Օր 4-ը ցույց տվեց, որ սահմանափակումը հաճախ կապն է։ Stream-երը դրա պատասխանն են. երբ n-րդ մասը հաշվվում է, n+1-րդը պատճենվում է device, իսկ n-1-րդը՝ հետ։ Այդ դեպքում առաստաղը երկու արագություններից մեծագույնն է, ոչ թե դրանց գումարը։
 
-## Visual
-![A single default stream running H2D copy, kernel and D2H copy back to back, next to two streams where one stream's copy overlaps another stream's kernel](streams_timeline.svg)
+## Պատկեր
+![Մեկ default stream, որը հերթով կատարում է H2D պատճենումը, kernel-ը և D2H պատճենումը, կողքին՝ երկու stream, որտեղ մեկի պատճենումը համընկնում է մյուսի kernel-ի հետ](streams_timeline.svg)
 
-The default stream runs everything in order, so the compute units are idle during both copies. With two or more streams the copy engine and the compute engine work at the same time. Events are how the saving is measured.
+Default stream-ը ամեն ինչ կատարում է հերթով, ուստի երկու պատճենման ընթացքում հաշվողական միավորները պարապ են։ Երկու կամ ավելի stream-ի դեպքում copy engine-ը և compute engine-ը աշխատում են միաժամանակ։ Խնայողությունը չափվում է event-ներով։
 
-![Four streams pipelined: each chunk's H2D copy, kernel and D2H copy staggered so that a later chunk's copy overlaps an earlier chunk's compute](async_pipeline.svg)
+![Չորս stream՝ pipeline-ով. ամեն մասի H2D պատճենումը, kernel-ը և D2H պատճենումը տեղաշարժված են այնպես, որ հաջորդ մասի պատճենումը համընկնի նախորդի հաշվարկի հետ](async_pipeline.svg)
 
-The pattern the hands-on task builds: split the input into chunks, put each chunk's copy-in, compute and copy-out on its own stream, and issue them so consecutive chunks overlap. It only works with pinned host buffers (Day 4); otherwise `cudaMemcpyAsync` falls back to synchronous behaviour without saying so.
+Լաբորատոր առաջադրանքը հենց սա է կառուցում. մուտքը բաժանել մասերի, ամեն մասի պատճենումը, հաշվարկը և հետ պատճենումը դնել իր stream-ում, և ուղարկել այնպես, որ հարևան մասերը համընկնեն։ Աշխատում է միայն pinned host բուֆերներով (Օր 4)։ Հակառակ դեպքում `cudaMemcpyAsync`-ը անցնում է սինխրոն վարքի և այդ մասին չի հայտնում։
 
-![Without a graph, every iteration re-pays the CPU launch cost for each launch; with a captured graph, the sequence is captured and instantiated once and then replayed with a single cudaGraphLaunch per iteration](cuda_graph.svg)
+![Առանց graph-ի ամեն կրկնություն ամեն launch-ի համար նորից վճարում է CPU-ի կողմից launch-ի ծախսը. graph-ով հաջորդականությունը մեկ անգամ գրանցվում և instantiate է արվում, ապա ամեն կրկնությանը վերարտադրվում մեկ cudaGraphLaunch-ով](cuda_graph.svg)
 
-Graphs do not make the GPU compute faster. They remove the CPU-side cost of re-issuing the same sequence of launches, which is visible only when a fixed pipeline runs many times.
+Graph-երը GPU-ի հաշվարկը չեն արագացնում։ Դրանք հանում են նույն launch-երի հաջորդականությունը նորից ուղարկելու CPU-ի ծախսը, ինչը նկատելի է միայն այն ժամանակ, երբ ֆիքսված pipeline-ը շատ անգամ է կատարվում։
 
-## Resources
+## Գրականություն
 - [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 3.2.8. Asynchronous Concurrent Execution · 3.2.8.7. CUDA Graphs
 - CUDA C++ Best Practices Guide — Asynchronous Transfers and Overlapping Transfers with Computation
 - Nsight Systems — User Guide, timeline view
 
-## Hands-On Task
-Process an image in row chunks across several streams, overlapping transfer and computation. Then capture the sequence into a graph and replay it.
+## Լաբորատոր առաջադրանք
+Պատկերը մշակել տողերի մասերով մի քանի stream-ում՝ համատեղելով փոխանցումը և հաշվարկը։ Ապա այդ հաջորդականությունը գրանցել graph-ի մեջ և վերարտադրել։
 
-## Self-Learning
-1. Overlap an async host-to-device copy with kernel execution using two streams; confirm the overlap with events and in the Nsight Systems timeline.
-2. Time a kernel with events and compare with your earlier host-side `<chrono>` measurement. Explain the difference.
-3. Increase the number of streams from 2 to 4 to 8 and record where the overlap stops improving.
-4. Capture the chunked pipeline into a CUDA graph. Launch it 1000 times and compare against 1000 sequential launches.
-5. Remove the pinned allocation from the async path and measure what happens.
+## Ինքնուրույն աշխատանք
+1. Երկու stream-ով համատեղել host-ից device ասինխրոն պատճենումը kernel-ի կատարման հետ։ Համատեղումը ստուգել event-ներով և Nsight Systems-ի timeline-ում։
+2. Kernel-ի ժամանակը չափել event-ներով և համեմատել ավելի վաղ host-ի վրա `<chrono>`-ով արված չափման հետ։ Բացատրել տարբերությունը։
+3. Stream-երի քանակը 2-ից հասցնել 4-ի, ապա 8-ի, և գրանցել, թե որտեղ է համատեղումը դադարում բարելավվել։
+4. Մասերով pipeline-ը գրանցել CUDA graph-ի մեջ։ Գործարկել այն 1000 անգամ և համեմատել 1000 հաջորդական launch-ի հետ։
+5. Ասինխրոն ճանապարհից հանել pinned հատկացումը և չափել, թե ինչ է տեղի ունենում։
 
-## Self-Check
-No answers given.
+## Ինքնաստուգում
+Պատասխանները տրված չեն։
 
-1. Why does `cudaMemcpyAsync` behave synchronously if the host buffer is not pinned?
-2. What goes wrong if you call `cudaEventElapsedTime` without `cudaEventSynchronize` first?
-3. Why does adding more streams eventually stop helping?
-4. Why does capturing kernels into a graph not make the GPU compute anything faster?
-5. During `cudaStreamBeginCapture`, does the launched kernel execute?
+1. Ինչու՞ է `cudaMemcpyAsync`-ը սինխրոն վարվում, եթե host-ի բուֆերը pinned չէ։
+2. Ի՞նչ է սխալ գնում, եթե `cudaEventElapsedTime` կանչեք առանց նախապես `cudaEventSynchronize`-ի։
+3. Ինչու՞ է stream-երի ավելացումը ի վերջո դադարում օգնել։
+4. Ինչու՞ kernel-ները graph-ի մեջ գրանցելը GPU-ի որևէ հաշվարկ չի արագացնում։
+5. `cudaStreamBeginCapture`-ի ընթացքում գործարկված kernel-ը կատարվու՞մ է։
 
-## Code Template
-See [`template.cu`](template.cu).
+## Կոդի template
+Տես [`template.cu`](template.cu)։

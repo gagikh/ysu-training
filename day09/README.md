@@ -1,73 +1,68 @@
-# Day 9: Libraries, Tensor Cores and Precision
+# Օր 9. Գրադարաններ, tensor core-եր և ճշգրտություն
 
-## Objectives
-- Replace hand-written kernels with cuBLAS, cuFFT, cuRAND and cuDNN, and say when a hand-written kernel is still justified
-- Explain what a tensor core does and what it requires of data layout and dimensions
-- Compare fp64, fp32, tf32, bf16 and fp16 throughput on the cluster GPU and state the consequences for numerical work
-- Explain why atomic accumulation is not reproducible run to run
+## Նպատակներ
+- Ձեռքով գրված kernel-ները փոխարինել cuBLAS-ով, cuFFT-ով, cuRAND-ով և cuDNN-ով, և ասել, թե երբ է սեփական kernel-ը դեռ արդարացված
+- Բացատրել, թե ինչ է անում tensor core-ը և ինչ է պահանջում տվյալների դասավորությունից ու չափերից
+- Համեմատել fp64-ի, fp32-ի, tf32-ի, bf16-ի և fp16-ի throughput-ը կլաստերի GPU-ի վրա և ասել, թե դա ինչ հետևանք ունի թվային հաշվարկների համար
+- Բացատրել, թե ինչու atomic-ներով կուտակումը գործարկումից գործարկում չի վերարտադրվում
 
-## Key Concepts
-- cuBLAS, cuSOLVER, cuSPARSE, cuFFT, cuRAND; CUB and Thrust
-- cuDNN, NPP and nvJPEG — what a deep learning framework actually calls
-- Tensor cores: matrix multiply-accumulate as one instruction; alignment and dimension requirements
-- Precision: fp64, fp32, tf32, bf16, fp16; fused multiply-add
-- Non-determinism of atomic accumulation and what reproducibility claims require
-- Cooperative groups: `tiled_partition`, group-typed shuffles, grid-wide sync
+## Հիմնական հասկացություններ
+- cuBLAS, cuSOLVER, cuSPARSE, cuFFT, cuRAND. CUB և Thrust
+- cuDNN, NPP և nvJPEG. այն, ինչ իրականում կանչում է deep learning framework-ը
+- Tensor core-եր՝ matrix multiply-accumulate մեկ հրամանով. հավասարեցման և չափերի պահանջներ
+- Ճշգրտություն՝ fp64, fp32, tf32, bf16, fp16. fused multiply-add
+- Atomic-ներով կուտակման ոչ դետերմինիզմը, և ինչ է պահանջում վերարտադրելիության պնդումը
+- Cooperative groups՝ `tiled_partition`, խմբի տիպով shuffle-ներ, ամբողջ grid-ի սինխրոնացում
 
-## Definitions
-**Tensor Core** — Specialised SM hardware, compute capability 7.0 and newer, for fast mixed-precision matrix multiply-accumulate. Used by cuBLAS and cuDNN, and reachable directly through the warp matrix functions.
+## Սահմանումներ
+**Tensor Core** — SM-ի մասնագիտացված hardware, compute capability 7.0-ից և նոր, խառը ճշգրտությամբ արագ matrix multiply-accumulate-ի համար։ Օգտագործվում է cuBLAS-ի և cuDNN-ի կողմից, և ուղիղ հասանելի է warp matrix ֆունկցիաներով։
 
-**MMA (matrix multiply-accumulate)** — The tensor core operation `D = A * B + C` on small matrix fragments, issued as one instruction per warp. Fragment shapes and alignment are fixed by the hardware, which is why dimensions have to be multiples of the fragment size to use it.
+**MMA (matrix multiply-accumulate)** — Tensor core-ի գործողությունը՝ `D = A * B + C` փոքր մատրիցային հատվածների վրա, որ ուղարկվում է մեկ հրամանով ամեն warp-ի համար։ Հատվածների չափերը և հավասարեցումը ֆիքսված են hardware-ում, և հենց դրա համար չափերը պետք է հատվածի չափի բազմապատիկ լինեն։
 
-**fp64, fp32, tf32, bf16, fp16** — Floating-point formats, given as exponent and mantissa bits. fp64: 11 and 52. fp32: 8 and 23. tf32: 8 and 10, a tensor core input format only. bf16: 8 and 7, the same range as fp32 with less precision. fp16: 5 and 10, narrower range and precision.
+**fp64, fp32, tf32, bf16, fp16** — Լողացող կետով ձևաչափեր՝ տրված էքսպոնենտի և մանտիսի բիթերով։ fp64՝ 11 և 52։ fp32՝ 8 և 23։ tf32՝ 8 և 10, միայն tensor core-ի մուտքի ձևաչափ։ bf16՝ 8 և 7, նույն տիրույթը, ինչ fp32-ը, ավելի ցածր ճշգրտությամբ։ fp16՝ 5 և 10, ավելի նեղ տիրույթ և ճշգրտություն։
 
-**Mixed precision** — Computing in a narrow format while accumulating in a wider one, typically fp16 or bf16 inputs with fp32 accumulation. This is what tensor cores do natively.
+**Խառը ճշգրտություն (mixed precision)** — Հաշվել նեղ ձևաչափով, իսկ կուտակել ավելի լայնով, սովորաբար fp16 կամ bf16 մուտքեր և fp32 կուտակում։ Tensor core-երը հենց այդպես են աշխատում։
 
-**FMA (fused multiply-add)** — `a * b + c` computed with a single rounding instead of two. One reason a GPU result and a CPU result can differ in the last bits for identical inputs in identical order.
+**FMA (fused multiply-add)** — `a * b + c`-ն հաշվված մեկ կլորացմամբ՝ երկուսի փոխարեն։ Սա պատճառներից մեկն է, որ նույն մուտքերի և նույն հերթականության դեպքում GPU-ի և CPU-ի արդյունքները կարող են տարբերվել վերջին բիթերում։
 
-**Non-determinism of atomic accumulation** — Atomics do not fix the order in which values are combined, and floating-point addition is not associative, so a kernel accumulating floats with `atomicAdd` can give different results run to run. A reproducibility claim requires a fixed reduction order.
+**Atomic-ներով կուտակման ոչ դետերմինիզմ** — Atomic-ները չեն ամրագրում արժեքների միավորման հերթականությունը, իսկ լողացող կետով գումարումը ասոցիատիվ չէ։ Ուստի `atomicAdd`-ով float-եր կուտակող kernel-ը կարող է գործարկումից գործարկում տարբեր արդյունք տալ։ Վերարտադրելիության պնդումը պահանջում է reduction-ի ֆիքսված հերթականություն։
 
-**Grid-wide synchronisation** — A barrier across every block of a grid, available through cooperative groups, and only for kernels launched with `cudaLaunchCooperativeKernel` and sized so that all blocks are resident at once.
+**Ամբողջ grid-ի սինխրոնացում** — Barrier grid-ի բոլոր block-երի համար, հասանելի cooperative groups-ով, և միայն `cudaLaunchCooperativeKernel`-ով գործարկված kernel-ների համար, որոնց չափն այնպիսին է, որ բոլոր block-երը միաժամանակ resident են։
 
-**cuBLAS, cuFFT, cuRAND, cuDNN, NPP, nvJPEG, CUB, Thrust** — NVIDIA's libraries: dense linear algebra; fast Fourier transforms; random number generation; deep learning primitives; image and signal processing; JPEG decode and encode; block- and device-level parallel primitives; and an STL-like algorithms layer built on CUB.
+**cuBLAS, cuFFT, cuRAND, cuDNN, NPP, nvJPEG, CUB, Thrust** — NVIDIA-ի գրադարանները՝ խիտ գծային հանրահաշիվ, արագ Ֆուրիեի ձևափոխություն, պատահական թվերի գեներացում, deep learning-ի պրիմիտիվներ, պատկերի և ազդանշանի մշակում, JPEG-ի վերծանում և կոդավորում, block-ի և device-ի մակարդակի զուգահեռ պրիմիտիվներ, և STL-ի նման ալգորիթմների շերտ՝ CUB-ի վրա։
 
-## Precision on your hardware
-On consumer and inference-class cards fp64 runs at 1/32 to 1/64 of the fp32 rate; on datacentre cards it is closer to 1/2. Determine which case applies to the cluster GPU from the Day 1 numbers before designing any double-precision work.
+## Ճշգրտությունը ձեր hardware-ի վրա
+Սպառողական և inference-ի դասի քարտերի վրա fp64-ը աշխատում է fp32-ի արագության 1/32-ից 1/64 մասով։ Տվյալների կենտրոնի քարտերի վրա այն մոտ է 1/2-ին։ Նախքան կրկնակի ճշգրտությամբ որևէ աշխատանք նախագծելը, Օր 1-ի թվերից որոշել, թե կլաստերի GPU-ն որ դեպքին է պատկանում։
 
-## Visual
-![Bit layout of fp64, fp32, tf32, bf16 and fp16, each split into sign, exponent and mantissa, drawn to scale](precision_formats.svg)
+## Պատկեր
+![fp64-ի, fp32-ի, tf32-ի, bf16-ի և fp16-ի բիթային դասավորությունը, ամեն մեկը բաժանված նշանի, էքսպոնենտի և մանտիսի, մասշտաբով](precision_formats.svg)
 
-The exponent field sets the range, the mantissa the precision. bf16 and tf32
-keep fp32's 8-bit exponent, so a value that fits in fp32 fits in them; fp16's
-5-bit exponent does not, which is why training in fp16 needs loss scaling and
-training in bf16 does not. tf32 is not a storage format: it exists only as a
-tensor core input, which is why cuBLAS turns it on through a math mode rather
-than through a data type.
+Էքսպոնենտի դաշտը որոշում է տիրույթը, մանտիսը՝ ճշգրտությունը։ bf16-ը և tf32-ը պահում են fp32-ի 8-բիթանոց էքսպոնենտը, ուստի fp32-ում տեղավորվող արժեքը տեղավորվում է նաև դրանցում։ fp16-ի 5-բիթանոց էքսպոնենտի դեպքում այդպես չէ, և հենց դրա համար fp16-ով ուսուցումը պահանջում է loss scaling, իսկ bf16-ով՝ ոչ։ tf32-ը պահպանման ձևաչափ չէ. այն գոյություն ունի միայն որպես tensor core-ի մուտք, և հենց դրա համար cuBLAS-ը այն միացնում է math mode-ով, ոչ թե տվյալների տիպով։
 
-## Resources
+## Գրականություն
 - [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 7.24. Warp Matrix Functions · 8. Cooperative Groups
 - Train With Mixed Precision: https://docs.nvidia.com/deeplearning/performance/
 - Micikevicius P. et al. Mixed Precision Training. *ICLR*, 2018. arXiv:1710.03740
 - cuBLAS, cuFFT, cuRAND: https://docs.nvidia.com/cuda/ · cuDNN: https://docs.nvidia.com/deeplearning/cudnn/
 
-## Hands-On Task
-Replace two hand-written kernels with library calls: the Day 5 and Day 6 box filter with NPP, and a matrix multiply with cuBLAS. The naive matrix multiply is given in the template, so this does not depend on Day 5's extension task. Then enable tensor cores and compare both speed and result.
+## Լաբորատոր առաջադրանք
+Երկու ձեռքով գրված kernel փոխարինել գրադարանային կանչերով՝ Օր 5-ի և Օր 6-ի box ֆիլտրը NPP-ով, իսկ մատրիցների բազմապատկումը՝ cuBLAS-ով։ Naive բազմապատկումը տրված է template-ում, ուստի այս առաջադրանքը կախված չէ Օր 5-ի ընդլայնված առաջադրանքից։ Ապա միացնել tensor core-երը և համեմատել և՛ արագությունը, և՛ արդյունքը։
 
-## Self-Learning
-1. Use cuBLAS for a matrix multiply and compare against your own kernel, in time and in result.
-2. Enable tf32 and then bf16 for the same multiply. Record speed and the difference in result against the fp32 baseline.
-3. Confirm from the profiler that tensor cores are actually being used, rather than assuming.
-4. Measure fp64 against fp32 throughput on the cluster GPU with a compute-bound kernel. Compare with the ratio published for that card.
-5. Sum the same large array with `atomicAdd` ten times. Record whether the results are bit-identical, and explain.
-6. Use cuRAND for a Monte Carlo estimate of pi.
+## Ինքնուրույն աշխատանք
+1. Մատրիցների բազմապատկումը կատարել cuBLAS-ով և համեմատել ձեր kernel-ի հետ՝ ժամանակով և արդյունքով։
+2. Նույն բազմապատկման համար միացնել tf32, ապա bf16։ Գրանցել արագությունը և արդյունքի տարբերությունը fp32-ի համեմատ։
+3. Profiler-ով հաստատել, որ tensor core-երն իրոք օգտագործվում են, ոչ թե ենթադրել։
+4. Compute-bound kernel-ով չափել fp64-ի throughput-ը fp32-ի համեմատ կլաստերի GPU-ի վրա։ Համեմատել այդ քարտի համար հրապարակված հարաբերության հետ։
+5. Նույն մեծ զանգվածը տասն անգամ գումարել `atomicAdd`-ով։ Գրանցել, արդյոք արդյունքները բիթ առ բիթ նույնն են, և բացատրել։
+6. cuRAND-ով Monte Carlo-ի եղանակով գնահատել π-ն։
 
-## Self-Check
-No answers given.
+## Ինքնաստուգում
+Պատասխանները տրված չեն։
 
-1. Why do GPUs older than Volta have no tensor cores, and what does that mean for cuBLAS on them?
-2. A student reports a 40x speedup from tensor cores with no accuracy loss. What would you ask to see?
-3. Why is `cg::tiled_partition<32>` preferable to a raw `__shfl_down_sync` even though they compile to the same instruction?
-4. Under what circumstances is writing your own kernel still the right answer when a library function exists?
+1. Ինչու՞ Volta-ից հին GPU-ները tensor core չունեն, և ինչ է դա նշանակում դրանց վրա cuBLAS-ի համար։
+2. Ուսանողը հայտնում է tensor core-երով 40 անգամ արագացում՝ առանց ճշգրտության կորստի։ Ի՞նչ կխնդրեիք ցույց տալ։
+3. Ինչու՞ է `cg::tiled_partition<32>`-ը նախընտրելի ուղիղ `__shfl_down_sync`-ից, եթե երկուսն էլ կոմպիլացվում են նույն հրամանի։
+4. Ի՞նչ պայմաններում է սեփական kernel գրելը դեռ ճիշտ պատասխան, երբ գրադարանային ֆունկցիա գոյություն ունի։
 
-## Code Template
-See [`template.cu`](template.cu).
+## Կոդի template
+Տես [`template.cu`](template.cu)։
