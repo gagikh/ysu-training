@@ -22,7 +22,7 @@ Terms used across this course, alphabetically. Each entry notes the day it is in
 
 **Block** — A group of threads, up to `maxThreadsPerBlock`, that execute on the same SM and can cooperate through shared memory and `__syncthreads()`. A kernel launch creates a grid of blocks. *(Day 2)*
 
-**`blockIdx`, `threadIdx`, `blockDim`, `gridDim`** — Built-in read-only variables in device code: the block's index in the grid, the thread's index in the block, the block's dimensions, the grid's dimensions. *(Day 2)*
+**`blockIdx`, `threadIdx`, `blockDim`, `gridDim`** — Built-in variables, available in device code without being declared or passed: the block's index in the grid, the thread's index in the block, the block's dimensions, the grid's dimensions. They are read-only, of type `uint3` (`dim3` for the dimensions), and each thread sees its own values. *(Day 2)*
 
 **Broadcast** — When every lane of a warp reads the same shared memory word, the hardware serves them in one transaction. This is not a conflict. *(Day 5)*
 
@@ -58,13 +58,13 @@ Terms used across this course, alphabetically. Each entry notes the day it is in
 
 **Device-side timing** — Measuring with events rather than a host clock, so the interval measured is the GPU's and excludes host-side launch latency. *(Day 8)*
 
-**Divergence (warp divergence)** — When threads within one warp take different paths through a branch. Because a warp executes in lockstep, the hardware runs each path separately with some lanes masked off, instead of in parallel. *(Day 3)*
+**Divergence (warp divergence)** — When threads within one warp take different paths through a branch. Because the 32 threads share one instruction stream, the hardware runs each path separately with some lanes masked off, instead of in parallel. *(Day 3)*
 
 **DMA (Direct Memory Access)** — A transfer carried out by a copy engine without the CPU moving the data. It requires the host pages to be page-locked, which is why pinned transfers are faster. *(Day 4)*
 
 **Double buffering** — Splitting the input into chunks and using two or more sets of buffers and streams, so that while chunk n is computed, chunk n+1 is copied in and chunk n-1 copied out. The ceiling becomes the larger of the transfer and compute rates rather than their sum. *(Day 8)*
 
-**Eligible, active and stalled warp** — An active, that is resident, warp occupies a warp slot on the SM. It is eligible when its next instruction's operands and the required unit are ready, and stalled otherwise. The scheduler issues only from eligible warps. *(Day 3)*
+**Eligible, active and stalled warp** — An active, that is resident, warp occupies a warp slot on the SM. It is eligible when nothing holds back its next instruction: the values that instruction reads are already in registers, meaning any earlier load it depends on has returned, and the unit that will execute it — the FP32 pipe, the load/store unit, a tensor core — is free this cycle. Otherwise the warp is stalled. Each cycle the scheduler picks one warp to issue from, and only eligible warps are candidates. *(Day 3)*
 
 **Event** — A marker placed in a stream with `cudaEventRecord`, which completes when all work preceding it in that stream completes. Used to wait, `cudaEventSynchronize`, and to measure, `cudaEventElapsedTime`. *(Day 8)*
 
@@ -206,7 +206,7 @@ Terms used across this course, alphabetically. Each entry notes the day it is in
 
 **Virtual and real architecture** — `-arch=compute_XX` names the virtual architecture PTX is generated for; `-code=sm_XX` names the real architecture SASS is generated for. `-arch=sm_XX` sets both. *(Day 1)*
 
-**Warp** — A group of 32 threads within a block that the hardware schedules and executes together in lockstep. The unit warp-level intrinsics operate on. *(Day 3)*
+**Warp** — A group of 32 threads within a block that the hardware schedules and executes together: one instruction is issued to all 32 at the same time, so at any moment they are on the same instruction. The unit warp-level intrinsics operate on. *(Day 3)*
 
 **Warp-aggregated atomics** — Having one lane perform a single atomic for the whole warp's contribution, computed first by a ballot and a warp reduction. Reduces the number of atomics by up to 32 times; the warp-scoped case of privatisation. *(Day 7)*
 

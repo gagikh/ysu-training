@@ -45,6 +45,18 @@ inline std::string UBytes(size_t bytes)
     return std::string(buf);
 }
 
+// CUDA 13 removed clockRate, memoryClockRate, computeMode and
+// singleToDoublePrecisionPerfRatio from cudaDeviceProp; code that reads them
+// no longer compiles. The attribute query below returns the same values in the
+// same units (clocks in kHz) and exists in CUDA 12 as well, so it works on
+// either toolkit.
+inline int device_attribute(cudaDeviceAttr attr, int device = 0)
+{
+    int v = 0;
+    CUDA_CHECK(cudaDeviceGetAttribute(&v, attr, device));
+    return v;
+}
+
 // Prints a detailed report of device 0's capabilities to stderr, and
 // returns its name.
 inline std::string report_device_capabilities()
@@ -77,21 +89,18 @@ inline std::string report_device_capabilities()
     std::cerr << "Max grid dimensions: [" << prop.maxGridSize[0] << ", "
               << prop.maxGridSize[1] << ", " << prop.maxGridSize[2] << "]" << std::endl;
     std::cerr << "CUDA total const memory: " << UBytes(prop.totalConstMem) << std::endl;
-    std::cerr << "CUDA compute mode: " << prop.computeMode << std::endl;
+    std::cerr << "CUDA compute mode: " << device_attribute(cudaDevAttrComputeMode) << std::endl;
     std::cerr << "CUDA async engines: " << prop.asyncEngineCount << std::endl;
     std::cerr << "CUDA persist cache size: " << UBytes(prop.persistingL2CacheMaxSize) << std::endl;
     std::cerr << "CUDA max threads per SM: " << prop.maxThreadsPerMultiProcessor << std::endl;
     std::cerr << "CUDA max warps per SM: " << prop.maxThreadsPerMultiProcessor / 32 << std::endl;
     std::cerr << "CUDA global L1: " << (prop.globalL1CacheSupported ? "Yes" : "No") << std::endl;
     std::cerr << "CUDA local L1: " << (prop.localL1CacheSupported ? "Yes" : "No") << std::endl;
-    std::cerr << "CUDA float/double perf ratio: " << prop.singleToDoublePrecisionPerfRatio << std::endl;
-    // NOTE: clockRate and memoryClockRate are deprecated as of CUDA 12 (they
-    // still work, but the headers warn). The modern spelling is
-    // cudaDeviceGetAttribute(&v, cudaDevAttrClockRate, 0) and
-    // cudaDevAttrMemoryClockRate. Kept as-is here because the field names
-    // read more clearly alongside the rest of this report.
-    std::cerr << "CUDA clock rate: " << prop.clockRate / 1000.0 << " MHz" << std::endl;
-    std::cerr << "CUDA memory clock rate: " << prop.memoryClockRate / 1000.0 << " MHz" << std::endl;
+    std::cerr << "CUDA float/double perf ratio: " << device_attribute(cudaDevAttrSingleToDoublePrecisionPerfRatio) << std::endl;
+    // Clock rates come from device_attribute(): the cudaDeviceProp fields that
+    // used to hold them were removed in CUDA 13. Both are reported in kHz.
+    std::cerr << "CUDA clock rate: " << device_attribute(cudaDevAttrClockRate) / 1000.0 << " MHz" << std::endl;
+    std::cerr << "CUDA memory clock rate: " << device_attribute(cudaDevAttrMemoryClockRate) / 1000.0 << " MHz" << std::endl;
     std::cerr << "CUDA bus width: " << prop.memoryBusWidth / 8 << " bytes" << std::endl;
     std::cerr << "CUDA reserved shared mem per block: " << UBytes(prop.reservedSharedMemPerBlock) << std::endl;
     std::cerr << "CUDA concurrent kernels: " << prop.concurrentKernels << std::endl;
@@ -133,7 +142,7 @@ inline std::string report_device_capabilities()
     std::cerr << "Free GPU memory: " << UBytes(free_bytes) << std::endl;
     std::cerr << "Memory usage: " << UBytes(total_bytes - free_bytes) << " / " << UBytes(total_bytes) << std::endl;
 
-    const auto memory_clock_rate_mhz = prop.memoryClockRate / 1000.0;
+    const auto memory_clock_rate_mhz = device_attribute(cudaDevAttrMemoryClockRate) / 1000.0;
     const auto bus_width_bytes = prop.memoryBusWidth / 8;
     const auto memory_bandwidth_gbps = 2.0 * memory_clock_rate_mhz * bus_width_bytes / 1000.0;
     std::cerr << "Theoretical memory bandwidth: " << memory_bandwidth_gbps << " GB/s" << std::endl;

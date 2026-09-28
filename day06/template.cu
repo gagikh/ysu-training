@@ -1,8 +1,8 @@
 // Day 6: Coalescing, Caches and Bandwidth
 // Goal: take Day 5's tiled filter to a stated percentage of peak bandwidth.
 //
-// Build:  cmake -B build && cmake --build build -j
-// Run:    ./build/day06 <image>
+// Build:  bash compile.sh day06        (login node, repository root)
+// Run:    sbatch submit.sh build/day06 <image>
 //
 // Day 5's working tiled filter is given below, so the whole session is spent
 // on the optimisations and on the measurement. Five TODOs, three of them one

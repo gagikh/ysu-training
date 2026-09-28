@@ -1,0 +1,8 @@
+# build output
+build/
+
+# job logs; the directory itself is kept by logs/.gitkeep
+logs/*.log
+
+# images the day programs write into the directory they run from
+/day0*_*.png

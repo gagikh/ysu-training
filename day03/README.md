@@ -8,14 +8,14 @@
 - Apply loop unrolling where it helps
 
 ## Key Concepts
-- SIMT and the instruction pipeline: fetch, decode, warp scheduler, lockstep issue
+- SIMT and the instruction pipeline: fetch, decode, warp scheduler, one instruction issued to all 32 lanes
 - Warp formation from `threadIdx`; why block sizes that are not multiples of 32 waste lanes
 - Eligible, active and stalled warps; what a stall reason means in a profiler
 - Branch divergence and reconvergence
 - Loop unrolling
 
 ## Definitions
-**Warp** — A group of 32 threads within a block that the hardware schedules and executes together in lockstep. The unit warp-level intrinsics operate on.
+**Warp** — A group of 32 threads within a block that the hardware schedules and executes together: one instruction is issued to all 32 at the same time, so at any moment they are on the same instruction. The unit warp-level intrinsics operate on.
 
 **SIMT (Single Instruction, Multiple Threads)** — NVIDIA's execution model: one instruction is fetched and decoded once and issued to all 32 threads of a warp at the same time.
 
@@ -23,13 +23,13 @@
 
 **Register file** — The per-SM storage from which every thread's registers are allocated. Its size is fixed, so registers per thread and resident warps trade against each other.
 
-**Eligible, active and stalled warp** — An active, that is resident, warp occupies a warp slot on the SM. It is eligible when its next instruction's operands and the required unit are ready, and stalled otherwise. The scheduler issues only from eligible warps.
+**Eligible, active and stalled warp** — An active, that is resident, warp occupies a warp slot on the SM. It is eligible when it is ready to issue: its next instruction has been decoded, every value that instruction reads is available — any earlier load it depends on has returned — and the unit that will execute it, the FP32 pipe, the load/store unit or a tensor core, is free this cycle. Otherwise the warp is stalled. Each cycle the scheduler picks one warp to issue from, and only eligible warps are candidates.
 
-**Stall reason** — The profiler's classification of why a warp was not eligible: a memory dependency, a barrier, a busy execution pipe, instruction fetch, and so on. It names what to fix.
+**Stall reason** — The profiler's classification of why a warp was not eligible. NVIDIA groups them as waiting on an instruction fetch, a memory dependency, an execution dependency or a synchronisation barrier. It names what to fix.
 
 **Latency hiding** — The GPU's performance strategy: when one warp stalls, the warp scheduler issues an instruction from a different, ready warp in the same cycle instead of leaving the pipeline idle. The reason GPUs favour many threads over few fast ones.
 
-**Divergence (warp divergence)** — When threads within one warp take different paths through a branch. Because a warp executes in lockstep, the hardware runs each path separately with some lanes masked off, instead of in parallel.
+**Divergence (warp divergence)** — When threads within one warp take different paths through a branch. Because the 32 threads share one instruction stream, the hardware runs each path separately with some lanes masked off, instead of in parallel.
 
 **Reconvergence** — The point after a divergent branch where all lanes of the warp execute the same instruction again. From Volta on, lanes have independent program counters and reconvergence at the end of a branch is not guaranteed; `__syncwarp` makes it explicit.
 
@@ -39,7 +39,7 @@
 A CPU reduces memory latency with deep cache hierarchies and speculation. A GPU largely does not: it tolerates the latency instead. When a warp stalls on a load, the scheduler issues an instruction from another resident warp in the same cycle. This single decision explains occupancy, why block size matters, why divergence is expensive, and why arithmetic intensity determines performance. Everything later in the course is a consequence of it.
 
 ## Visual
-![SIMT instruction pipeline: fetch, decode, warp scheduler, then one instruction issued in lockstep to all 32 lanes of a warp](pipeline.svg)
+![SIMT instruction pipeline: fetch, decode, warp scheduler, then one instruction issued at once to all 32 lanes of a warp](pipeline.svg)
 
 One instruction is fetched and decoded once, then issued to all 32 threads of a warp at the same time. This is the reason divergence costs: when lanes disagree on a branch the hardware masks lanes off and runs each path in turn.
 
@@ -60,6 +60,7 @@ A steppable version is in [`warp_animations.html`](warp_animations.html). Open i
 
 ## Resources
 - [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 4. Hardware Implementation · 5. Performance Guidelines
+- [Nsight Compute Kernel Profiling Guide](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html) — 2.3.1. Hardware Model: the source of the active, eligible and stalled warp states used above
 - Oxford CUDA course, lecture 3: https://people.maths.ox.ac.uk/~gilesm/cuda/lecs/lec3.pdf
 - Using CUDA warp-level primitives: https://developer.nvidia.com/blog/using-cuda-warp-level-primitives/
 - Pipeline and warp scheduling diagrams: see `Visual` and `Animated` above; interactive version in [`warp_animations.html`](warp_animations.html)

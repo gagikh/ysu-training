@@ -8,7 +8,7 @@ ptxas -arch=sm_80 add.ptx -o add.cubin            # PTX  -> SASS (cubin)
 nvdisasm -c add.cubin                             # show the SASS
 ```
 
-On a machine with a GPU, `nvcc -arch=native -cubin add.cu -o add.cubin` followed by `cuobjdump --dump-sass add.cubin` does the same for the card you are actually running on. The SASS will differ from what is printed here if the architecture differs.
+For the cluster's H100, `nvcc -arch=sm_90 -cubin add.cu -o add.cubin` followed by `cuobjdump --dump-sass add.cubin` does the same. The SASS will differ from what is printed here, which is for `sm_80`.
 
 ## The source
 

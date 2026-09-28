@@ -65,18 +65,24 @@ day measures against those numbers rather than against adjectives. By Day 6 a ke
 expressed as a percentage of peak bandwidth; by Day 10 that same method is used to decide
 whether a student's proposed project is possible at all.
 
-## Building
+## Building and running
+
+On the cluster, from the repository root: compile on the login node, run on a
+GPU node through SLURM.
 
 ```
-cmake -B build
-cmake --build build -j
-./build/day01
+bash compile.sh day01
+sbatch submit.sh build/day01
 ```
 
-CMake 3.24 or newer, since that is the first version that accepts
-`CUDA_ARCHITECTURES native`. `native` compiles for the card in the machine
-doing the build; for a different target pass
-`-DCMAKE_CUDA_ARCHITECTURES=80` instead.
+The output lands in `logs/report_<job id>.log`. Days 5 to 9 take an image:
+
+```
+bash compile.sh day05
+sbatch submit.sh build/day05 <image>
+```
+
+`compile.sh` targets `sm_90`, the cluster's H100, with CUDA 12.8.
 
 Days 5 to 9 read an image from disk, write the result back and display it when
 a display is available, so they need OpenCV 4 — the `core`, `imgcodecs` and
@@ -85,14 +91,16 @@ a display is available, so they need OpenCV 4 — the `core`, `imgcodecs` and
 transfer are the subject of Days 4 to 6 and stay visible in the lab code.
 Day 9 additionally links cuBLAS and NPP, both part of the CUDA toolkit.
 
-Each `template.cu` also carries a plain `nvcc` line for building one day on
-its own.
+The headers in `common/` read clock rates through `cudaDeviceGetAttribute`
+rather than the `cudaDeviceProp` fields. The fields are deprecated in CUDA 12
+and removed in CUDA 13, so this keeps the course compiling after the cluster
+is upgraded.
 
 ## Before the first session
 
-- Cluster access, one pinned CUDA version and one container image for everyone.
-- OpenCV 4 and CMake 3.24+ in that image; `cmake -B build && cmake --build build` succeeds.
-- `report_device_capabilities()` runs and prints sensible numbers.
+- Cluster access, one CUDA version and one environment for everyone.
+- OpenCV 4 on the login node: `pkg-config --modversion opencv4` prints a version.
+- `bash compile.sh day01 && sbatch submit.sh build/day01` produces a log with sensible numbers.
 - A test image on the cluster that every participant can read.
 
 ## Reference material

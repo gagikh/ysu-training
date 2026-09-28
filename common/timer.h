@@ -110,7 +110,9 @@ struct kernel_timer_t
     // Every term earns its place -- work through it once and you'll never
     // have to look it up again:
     //
-    //   p.memoryClockRate       UNIT: kilohertz. Not Hz, not MHz -- the CUDA
+    //   memory clock rate       cudaDevAttrMemoryClockRate (the cudaDeviceProp
+    //                           field was removed in CUDA 13).
+    //                           UNIT: kilohertz. Not Hz, not MHz -- the CUDA
     //                           runtime reports clocks in kHz. An RTX 4090
     //                           reports 10501000.
     //
@@ -159,7 +161,9 @@ struct kernel_timer_t
     {
         cudaDeviceProp p;
         CUDA_CHECK(cudaGetDeviceProperties(&p, device));
-        return 2.0 * (p.memoryClockRate / 1000.0) * (p.memoryBusWidth / 8) / 1000.0;
+        int mem_khz = 0;
+        CUDA_CHECK(cudaDeviceGetAttribute(&mem_khz, cudaDevAttrMemoryClockRate, device));
+        return 2.0 * (mem_khz / 1000.0) * (p.memoryBusWidth / 8) / 1000.0;
     }
 
     // Peak FP32 in TFLOP/s. FP32 lanes per SM is NOT queryable through
@@ -176,7 +180,9 @@ struct kernel_timer_t
         else if (p.major == 8 && p.minor == 0) lanes = 64; // A100
         else if (p.major == 6 && p.minor == 0) lanes = 64; // P100
 
-        const double ghz = p.clockRate / 1e6;           // kHz -> GHz
+        int sm_khz = 0;
+        CUDA_CHECK(cudaDeviceGetAttribute(&sm_khz, cudaDevAttrClockRate, device));
+        const double ghz = sm_khz / 1e6;                // kHz -> GHz
         return 2.0 * p.multiProcessorCount * lanes * ghz / 1000.0;
     }
 

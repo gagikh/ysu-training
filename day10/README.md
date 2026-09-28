@@ -23,4 +23,4 @@ and 6, the library and precision trade-offs from Day 9.
 
 - [`topics-bank.md`](topics-bank.md) — worked examples to take from or adapt
 - [`PERFORMANCE.md`](../PERFORMANCE.md) — optimisation order and stopping criteria
-- [`TASKS.md`](../TASKS.md) — 100 practice tasks from the student course
+- [`TASKS.md`](../TASKS.md) — practice tasks, grouped by day

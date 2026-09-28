@@ -79,7 +79,7 @@ Run `report_device_capabilities()` on the cluster GPU and write down the numbers
 1. Print `Hello from block X, thread Y` with device-side `printf`, launched as `<<<1,1>>>`, `<<<2,4>>>`, `<<<4,32>>>`.
 2. Have each thread write its raw `blockIdx.x` and `threadIdx.x` into two arrays; copy back and verify against the launch configuration.
 3. From `report_device_capabilities()` output, compute the theoretical peak FP32 throughput and peak memory bandwidth of the cluster GPU. Compare with NVIDIA's published figures and account for the difference.
-4. Compile the same kernel with `-arch=sm_75` and with `-arch=native`; dump SASS for both with `cuobjdump --dump-sass` and diff the output.
+4. Compile the same kernel with `-arch=sm_75` and with `-arch=sm_90`; dump SASS for both with `cuobjdump --dump-sass` and diff the output.
 5. Launch with 5000 threads per block once without `CUDA_CHECK_LAST_ERROR()` and once with it. Note what each run tells you.
 
 ## Self-Check

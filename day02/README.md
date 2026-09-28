@@ -24,13 +24,67 @@
 
 **Launch configuration** — The arguments of a kernel call: grid dimensions in blocks and block dimensions in threads, each up to three-dimensional, plus optional dynamic shared memory size and stream.
 
-**`blockIdx`, `threadIdx`, `blockDim`, `gridDim`** — Built-in read-only variables in device code: the block's index in the grid, the thread's index in the block, the block's dimensions, the grid's dimensions.
+**`blockIdx`, `threadIdx`, `blockDim`, `gridDim`** — Built-in variables, available in device code without being declared or passed: the block's index in the grid, the thread's index in the block, the block's dimensions, the grid's dimensions. They are read-only, of type `uint3` (`dim3` for the dimensions), and each thread sees its own values.
+
+Nothing in your code initialises them, and they are not ordinary variables sitting in memory:
+
+| Variable | PTX | Set by |
+|---|---|---|
+| `threadIdx` | `%tid` | the hardware, when the SM creates the block's threads |
+| `blockIdx` | `%ctaid` | the GPU's work distributor, when it assigns the block to an SM |
+| `blockDim` | `%ntid` | the launch configuration — the host wrote it in `<<<grid, block>>>` |
+| `gridDim` | `%nctaid` | the launch configuration, likewise |
+
+So the first two are hardware identity and the second two are launch parameters, which is why the second two are the same for every thread in the grid. Reading one is an instruction, not a memory access. In the Day 1 example, the PTX
+
+```ptx
+mov.u32  %r3, %ntid.x;     // blockDim.x
+mov.u32  %r4, %ctaid.x;    // blockIdx.x
+mov.u32  %r5, %tid.x;      // threadIdx.x
+```
+
+becomes SASS in which `threadIdx` and `blockIdx` are read with a special-register instruction while `blockDim` is read straight out of the constant bank:
+
+```sass
+S2R  R6, SR_CTAID.X ;
+S2R  R3, SR_TID.X ;
+IMAD R6, R6, c[0x0][0x0], R3 ;   // c[0x0][0x0] is blockDim.x
+```
 
 **Resident blocks** — The blocks assigned to one SM at the same time. The count is the smallest of three limits: the hardware cap on blocks per SM, registers per SM divided by the block's register demand, and shared memory per SM divided by the block's shared memory demand.
 
 **Occupancy** — How many warps are resident on an SM at once relative to the maximum it could hold. Limited by whichever resource runs out first: registers per thread, shared memory per block, or the thread-count cap. It is a means to **latency hiding**, not a goal — returns flatten past roughly 50 percent, and coarsened kernels trade it away deliberately.
 
 **`cudaOccupancyMaxActiveBlocksPerMultiprocessor`** — The runtime call returning how many blocks of a given kernel and block size will be resident per SM, without running the kernel.
+
+```c
+cudaError_t cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+    int        *numBlocks,        // out: resident blocks per SM
+    const void *func,             // the kernel symbol
+    int         blockSize,        // threads per block you intend to launch with
+    size_t      dynamicSMemSize); // dynamic shared memory per block in bytes, 0 if none
+```
+
+`func` is the kernel name itself; in C++ it decays to the function's address, so the call reads `cudaOccupancyMaxActiveBlocksPerMultiprocessor(&n, my_kernel, 256, 0)`. `dynamicSMemSize` is the third launch argument, `my_kernel<<<grid, block, smem>>>`, not the statically declared `__shared__` arrays — those the compiler already accounted for.
+
+What comes back is a block count, not a percentage. Occupancy is derived:
+
+```c
+int n;
+CUDA_CHECK(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&n, my_kernel, blockSize, 0));
+
+cudaDeviceProp p;
+CUDA_CHECK(cudaGetDeviceProperties(&p, 0));
+
+double occupancy = double(n * blockSize) / p.maxThreadsPerMultiProcessor;
+```
+
+The answer is computed from the compiled kernel's register count and shared memory request against this device's limits. Nothing is launched, so it is an upper bound on residency, not a measurement: it says how many blocks *could* be resident, not how busy the SM actually was. The measurement is `sm__warps_active.avg.pct_of_peak_sustained_active` in Nsight Compute, and the two differ whenever blocks finish at different times or the grid is too small to fill the device.
+
+Two companions:
+
+- `cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags(..., unsigned int flags)` — same call with `cudaOccupancyDefault` for the normal behaviour, or `cudaOccupancyDisableCachingOverride` to suppress a platform-specific caching adjustment.
+- `cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, func, dynamicSMemSize, blockSizeLimit)` — the inverse question. Instead of scoring a block size you chose, it returns the block size with the best potential occupancy, and the smallest grid that reaches it. Useful as a starting point, not as an answer: best occupancy is not the same as fastest.
 
 **Coalescing (memory coalescing)** — When the 32 lanes of a warp access consecutive addresses, the hardware serves them in a single 128-byte transaction instead of up to 32 separate ones. The property belongs to the warp, not the thread: what matters is the combined footprint of one instruction across all 32 lanes, not the pattern one thread traces over time.
 

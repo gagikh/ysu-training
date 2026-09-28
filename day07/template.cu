@@ -2,8 +2,8 @@
 // Goal: (a) the mean of an image by warp reduction plus one atomic per block,
 //       (b) a 256-bin histogram, twice: global atomics, then privatised.
 //
-// Build:  cmake -B build && cmake --build build -j
-// Run:    ./build/day07 <image>
+// Build:  bash compile.sh day07        (login node, repository root)
+// Run:    sbatch submit.sh build/day07 <image>
 //
 // Scan, stream compaction and warp-aggregated atomics are in Self-Learning,
 // not here. Eight TODOs.
