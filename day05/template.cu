@@ -3,7 +3,7 @@
 //       reading the image once into shared memory per block.
 //
 // Build:  ./compile.sh day05/template.cu      (login node, repository root)
-// Run:    sbatch submit.sh template <image>
+// Run:    sbatch submit.sh template <image.bmp>
 //
 // Time: five TODOs. TODO 1 and 2 are the lab; 3 is the same structure again
 // and should be quick once 1 and 2 work; 4 and 5 are measurements, not code.
@@ -84,25 +84,25 @@ __global__ void sobel_tiled(const unsigned char *in, size_t in_pitch,
 int main(int argc, char **argv)
 {
     if (argc < 2) {
-        printf("usage: %s <image>\n", argv[0]);
+        printf("usage: %s <image.bmp>\n", argv[0]);
         return 1;
     }
 
     printf("%s", report_device_capabilities().c_str());
 
-    cv::Mat h_in = load_gray(argv[1]);
-    cv::Mat h_out(h_in.size(), h_in.type());
+    image_t h_in = load_bmp(argv[1]);
+    image_t h_out(h_in.width, h_in.height);
 
-    device_image_t<unsigned char> d_in(h_in.cols, h_in.rows);
-    device_image_t<unsigned char> d_out(h_in.cols, h_in.rows);
+    device_image_t<unsigned char> d_in(h_in.width, h_in.height);
+    device_image_t<unsigned char> d_out(h_in.width, h_in.height);
     d_in.upload(h_in);
 
     // cudaMallocPitch padded each row. Worth printing once: this is the
     // difference between pitch and width * sizeof(T) that the README defines.
-    printf("width %d bytes, pitch %zu bytes\n", h_in.cols, d_in.pitch);
+    printf("width %d bytes, pitch %zu bytes\n", h_in.width, d_in.pitch);
 
     const dim3 block(TILE, TILE);
-    const dim3 grid(div_up(h_in.cols, TILE), div_up(h_in.rows, TILE));
+    const dim3 grid(div_up(h_in.width, TILE), div_up(h_in.height, TILE));
 
     // Read + write per launch. Both kernels touch every pixel twice in total,
     // so the same figure applies to all three and they are comparable.
@@ -112,7 +112,7 @@ int main(int argc, char **argv)
     for (int i = 0; i < 20; ++i) {
         t.start();
         box_filter_global<<<grid, block>>>(d_in.ptr, d_in.pitch, d_out.ptr, d_out.pitch,
-                                           h_in.cols, h_in.rows);
+                                           h_in.width, h_in.height);
         CUDA_CHECK_LAST_ERROR();
         t.stop();
     }
@@ -122,25 +122,25 @@ int main(int argc, char **argv)
     for (int i = 0; i < 20; ++i) {
         t.start();
         box_filter_tiled<<<grid, block>>>(d_in.ptr, d_in.pitch, d_out.ptr, d_out.pitch,
-                                          h_in.cols, h_in.rows);
+                                          h_in.width, h_in.height);
         CUDA_CHECK_LAST_ERROR();
         t.stop();
     }
     t.report_bandwidth("box, shared tile", bytes);
     d_out.download(h_out);
-    save_and_show("day05_box.png", h_out);
+    save_bmp("day05_box.bmp", h_out);
 
     t.reset();
     for (int i = 0; i < 20; ++i) {
         t.start();
         sobel_tiled<<<grid, block>>>(d_in.ptr, d_in.pitch, d_out.ptr, d_out.pitch,
-                                     h_in.cols, h_in.rows);
+                                     h_in.width, h_in.height);
         CUDA_CHECK_LAST_ERROR();
         t.stop();
     }
     t.report_bandwidth("sobel, shared tile", bytes);
     d_out.download(h_out);
-    save_and_show("day05_sobel.png", h_out);
+    save_bmp("day05_sobel.bmp", h_out);
 
     // TODO 4: the tiled version should beat the global one. By how much, and
     // is that the factor you predicted from the number of avoided loads?

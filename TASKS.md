@@ -38,7 +38,7 @@ See [GLOSSARY.md](GLOSSARY.md) if a term is unfamiliar, [PERFORMANCE.md](PERFORM
 20. Try mapped (zero-copy) memory and compare its transfer behavior to pinned.
 
 ## Day 5 — Shared memory and bank conflicts
-25. Load and display a real image with `cv::imread`/`cv::imshow` before writing any kernel logic.
+25. Load a real image with `load_bmp`, write it back unchanged with `save_bmp`, and open the result, before writing any kernel logic.
 21. Implement a shared-memory tile-based 2D box blur.
 22. Deliberately create a bank-conflicting access pattern, measure the hit, then fix it with padding.
 23. Implement a 2D Sobel filter using shared memory.
@@ -90,7 +90,7 @@ See [GLOSSARY.md](GLOSSARY.md) if a term is unfamiliar, [PERFORMANCE.md](PERFORM
 66. Estimate π via Monte Carlo sampling with cuRAND.
 67. Use cuBLAS for a matrix-vector multiply and compare against your Day 5 kernel.
 68. Use cuFFT to compute an FFT and compare against your Day 7 32-point attempt.
-69. Fill a device buffer with cuRAND-generated noise, download it and write it out with `cv::imwrite`.
+69. Fill a device buffer with cuRAND-generated noise, download it and write it out with `save_bmp`.
 98. Implement one kernel in half precision (FP16) and compare accuracy and speed against FP32.
 
 ## Day 10 — Discussion of proposals

@@ -11,7 +11,7 @@
 - `__syncthreads()`՝ ինչ է երաշխավորում, և ինչ արժե occupancy-ի առումով
 - Shared memory-ն և L1-ը կիսում են նույն ֆիզիկական SRAM-ը, և բաժանումը կարգավորելի է
 - Constant memory և broadcast-ի ուղին
-- Pitched հիշողություն և ինչու է `step`-ը տարբերվում `cols * elemSize()`-ից
+- Pitched հիշողություն և ինչու է pitch-ը տարբերվում `width * sizeof(T)`-ից
 - Tiling-ը որպես global memory-ի տրաֆիկի կրճատում
 
 ## Սահմանումներ

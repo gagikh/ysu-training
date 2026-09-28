@@ -2,7 +2,7 @@
 // Goal: take Day 5's tiled filter to a stated percentage of peak bandwidth.
 //
 // Build:  ./compile.sh day06/template.cu      (login node, repository root)
-// Run:    sbatch submit.sh template <image>
+// Run:    sbatch submit.sh template <image.bmp>
 //
 // Day 5's working tiled filter is given below, so the whole session is spent
 // on the optimisations and on the measurement. Five TODOs, three of them one
@@ -95,19 +95,19 @@ __global__ void box_tiled_coarsened(const unsigned char *__restrict__ in, size_t
 int main(int argc, char **argv)
 {
     if (argc < 2) {
-        printf("usage: %s <image>\n", argv[0]);
+        printf("usage: %s <image.bmp>\n", argv[0]);
         return 1;
     }
 
-    cv::Mat h_in = load_gray(argv[1]);
-    cv::Mat h_out(h_in.size(), h_in.type());
+    image_t h_in = load_bmp(argv[1]);
+    image_t h_out(h_in.width, h_in.height);
 
-    device_image_t<unsigned char> d_in(h_in.cols, h_in.rows);
-    device_image_t<unsigned char> d_out(h_in.cols, h_in.rows);
+    device_image_t<unsigned char> d_in(h_in.width, h_in.height);
+    device_image_t<unsigned char> d_out(h_in.width, h_in.height);
     d_in.upload(h_in);
 
     const dim3 block(TILE, TILE);
-    const dim3 grid(div_up(h_in.cols, TILE), div_up(h_in.rows, TILE));
+    const dim3 grid(div_up(h_in.width, TILE), div_up(h_in.height, TILE));
 
     // One read and one write of every pixel. This is the useful traffic, not
     // the traffic the hardware actually moves -- TODO 5 is about the gap.
@@ -119,42 +119,42 @@ int main(int argc, char **argv)
     for (int i = 0; i < 50; ++i) {
         t.start();
         box_tiled<<<grid, block>>>(d_in.ptr, d_in.pitch, d_out.ptr, d_out.pitch,
-                                   h_in.cols, h_in.rows);
+                                   h_in.width, h_in.height);
         CUDA_CHECK_LAST_ERROR();
         t.stop();
     }
     t.report_bandwidth("Day 5 tiled", bytes);
     d_out.download(h_out);
-    save_and_show("day06_baseline.png", h_out);
+    save_bmp("day06_baseline.bmp", h_out);
 
     t.reset();
     for (int i = 0; i < 50; ++i) {
         t.start();
         box_tiled_ldg<<<grid, block>>>(d_in.ptr, d_in.pitch, d_out.ptr, d_out.pitch,
-                                       h_in.cols, h_in.rows);
+                                       h_in.width, h_in.height);
         CUDA_CHECK_LAST_ERROR();
         t.stop();
     }
     t.report_bandwidth("+ __ldg", bytes);
 
-    const dim3 grid_c(div_up(h_in.cols, TILE), div_up(h_in.rows, TILE * COARSEN));
+    const dim3 grid_c(div_up(h_in.width, TILE), div_up(h_in.height, TILE * COARSEN));
     t.reset();
     for (int i = 0; i < 50; ++i) {
         t.start();
         box_tiled_coarsened<<<grid_c, block>>>(d_in.ptr, d_in.pitch, d_out.ptr, d_out.pitch,
-                                               h_in.cols, h_in.rows);
+                                               h_in.width, h_in.height);
         CUDA_CHECK_LAST_ERROR();
         t.stop();
     }
     t.report_bandwidth("+ coarsened", bytes);
     d_out.download(h_out);
-    save_and_show("day06_optimised.png", h_out);
+    save_bmp("day06_optimised.bmp", h_out);
 
     // TODO 4: write down the three percentages. Decide, from the numbers and
     // not from taste, whether this kernel is worth optimising further.
     //
     // TODO 5: run the best version under
-    //   ncu --metrics dram__bytes_read.sum,dram__bytes_write.sum ./template <image>
+    //   ncu --metrics dram__bytes_read.sum,dram__bytes_write.sum ./template <image.bmp>
     // and compare what the hardware moved with the useful bytes above. Account
     // for the difference: sector granularity, the halo read by two blocks, the
     // pitch padding.

@@ -4,8 +4,8 @@
 //       sequence into a graph and replay it.
 //
 // Build:  ./compile.sh day08/template.cu      (login node, repository root)
-// Run:    sbatch submit.sh template <image>
-//         under Nsight Systems, on a GPU node: nsys profile -o logs/day08 ./template <image>
+// Run:    sbatch submit.sh template <image.bmp>
+//         under Nsight Systems, on a GPU node: nsys profile -o logs/day08 ./template <image.bmp>
 //
 // Seven TODOs. The kernel is given: today is about what surrounds it.
 
@@ -29,12 +29,12 @@ __global__ void invert_band(const unsigned char *in, unsigned char *out, int cou
 int main(int argc, char **argv)
 {
     if (argc < 2) {
-        printf("usage: %s <image>\n", argv[0]);
+        printf("usage: %s <image.bmp>\n", argv[0]);
         return 1;
     }
 
-    cv::Mat h_in_mat = load_gray(argv[1]);
-    const int width = h_in_mat.cols, height = h_in_mat.rows;
+    image_t h_in_img = load_bmp(argv[1]);
+    const int width = h_in_img.width, height = h_in_img.height;
     const size_t total = static_cast<size_t>(width) * height;
 
     // TODO 1: allocate pinned host buffers for the input and the output with

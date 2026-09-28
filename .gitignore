@@ -5,4 +5,4 @@
 logs/*.log
 
 # images the programs write into the directory they run from
-/day0*_*.png
+/day0*_*.bmp

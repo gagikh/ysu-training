@@ -7,6 +7,6 @@
 #SBATCH --output=logs/report_%j.log
 
 # sbatch submit.sh template
-# sbatch submit.sh template image.png
+# sbatch submit.sh template data/camera.bmp
 
 ./"$@"

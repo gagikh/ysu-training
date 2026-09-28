@@ -4,7 +4,7 @@
 //       tensor cores and measure what precision costs.
 //
 // Build:  ./compile.sh day09/template.cu      (login node, repository root)
-// Run:    sbatch submit.sh template <image> [matrix size, default 2048]
+// Run:    sbatch submit.sh template <image.bmp> [matrix size, default 2048]
 //
 // The naive matrix multiply is given here, so this day does not depend on
 // Day 5's extension task. Seven TODOs.
@@ -55,7 +55,7 @@ __global__ void matmul_naive(const float *A, const float *B, float *C, int n)
 int main(int argc, char **argv)
 {
     if (argc < 2) {
-        printf("usage: %s <image> [n]\n", argv[0]);
+        printf("usage: %s <image.bmp> [n]\n", argv[0]);
         return 1;
     }
     const int n = (argc > 2) ? atoi(argv[2]) : 2048;
@@ -117,11 +117,11 @@ int main(int argc, char **argv)
     for (float *p : {d_A, d_B, d_C, d_C_ref}) CUDA_CHECK(cudaFree(p));
 
     // ============================================================ the filter
-    cv::Mat h_img = load_gray(argv[1]);
-    cv::Mat h_out(h_img.size(), h_img.type());
+    image_t h_img = load_bmp(argv[1]);
+    image_t h_out(h_img.width, h_img.height);
 
-    device_image_t<unsigned char> d_img(h_img.cols, h_img.rows);
-    device_image_t<unsigned char> d_filtered(h_img.cols, h_img.rows);
+    device_image_t<unsigned char> d_img(h_img.width, h_img.height);
+    device_image_t<unsigned char> d_filtered(h_img.width, h_img.height);
     d_img.upload(h_img);
 
     // TODO 5: the Day 5 and Day 6 box filter as one NPP call:
@@ -138,6 +138,6 @@ int main(int argc, char **argv)
     // is still worth writing.
 
     d_filtered.download(h_out);
-    save_and_show("day09_npp.png", h_out);
+    save_bmp("day09_npp.bmp", h_out);
     return 0;
 }

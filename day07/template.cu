@@ -3,7 +3,7 @@
 //       (b) a 256-bin histogram, twice: global atomics, then privatised.
 //
 // Build:  ./compile.sh day07/template.cu      (login node, repository root)
-// Run:    sbatch submit.sh template <image>
+// Run:    sbatch submit.sh template <image.bmp>
 //
 // Scan, stream compaction and warp-aggregated atomics are in Self-Learning,
 // not here. Eight TODOs.
@@ -89,12 +89,12 @@ __global__ void histogram_private(const unsigned char *in, size_t pitch,
 int main(int argc, char **argv)
 {
     if (argc < 2) {
-        printf("usage: %s <image>\n", argv[0]);
+        printf("usage: %s <image.bmp>\n", argv[0]);
         return 1;
     }
 
-    cv::Mat h_in = load_gray(argv[1]);
-    const int width = h_in.cols, height = h_in.rows;
+    image_t h_in = load_bmp(argv[1]);
+    const int width = h_in.width, height = h_in.height;
     const long long pixels = static_cast<long long>(width) * height;
 
     device_image_t<unsigned char> d_in(width, height);
@@ -117,10 +117,12 @@ int main(int argc, char **argv)
     CUDA_CHECK(cudaMemcpy(&h_total, d_total, sizeof(h_total), cudaMemcpyDeviceToHost));
     printf("GPU mean  %.6f\n", static_cast<double>(h_total) / pixels);
 
-    // TODO 6: check it. cv::mean(h_in)[0] is the reference. They should agree
+    // TODO 6: check it. The host loop below is the reference. They should agree
     // exactly here, because the accumulation is in integers. Repeat the
     // exercise with a float accumulator and explain why that one does not.
-    printf("CPU mean  %.6f\n", cv::mean(h_in)[0]);
+    double host_sum = 0;
+    for (unsigned char p : h_in.data) host_sum += p;
+    printf("CPU mean  %.6f\n", host_sum / pixels);
 
     // ---- histogram ------------------------------------------------------
     const double bytes = static_cast<double>(d_in.useful_bytes());   // read only

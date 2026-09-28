@@ -70,17 +70,15 @@ whether a student's proposed project is possible at all.
 ```
 ./compile.sh day01/template.cu
 sbatch submit.sh template
-sbatch submit.sh template image.png    # days 5-9
+sbatch submit.sh template data/camera.bmp    # days 5-9
 ```
 
-The output is in `logs/`. Target: H100 (`sm_90`), CUDA 12.8. Days 5 to 9 need OpenCV 4.
+The output is in `logs/`. Target: H100 (`sm_90`), CUDA 12.8. Days 5 to 9 read and write BMP images with `common/bmp_utilities.h`; test images are in `data/`.
 
 ## Before the first session
 
 - Cluster access, one CUDA version and one environment for everyone.
-- OpenCV 4 on the login node: `pkg-config --modversion opencv4` prints a version.
 - `./compile.sh day01/template.cu && sbatch submit.sh template` produces a log with sensible numbers.
-- A test image on the cluster that every participant can read.
 
 ## Reference material
 
