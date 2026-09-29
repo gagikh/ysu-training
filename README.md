@@ -77,6 +77,7 @@ The output is in `logs/`. Target: H100 (`sm_90`), CUDA 12.8. Days 5 to 9 read an
 
 ## Before the first session
 
+- [CLUSTER.md](CLUSTER.md): connecting, the environment, the first run, copying files back.
 - Cluster access, one CUDA version and one environment for everyone.
 - `./compile.sh day01/template.cu && sbatch submit.sh template` produces a log with sensible numbers.
 

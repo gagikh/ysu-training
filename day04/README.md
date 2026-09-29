@@ -1,48 +1,77 @@
 # Օր 4. Հիշողության տեսակները և host-device փոխանցումները
 
 ## Նպատակներ
-- Տարբերել paged, pinned, page-locked, mapped և unified հիշողությունը, և անվանել ամեն մեկի API-ն
-- Բացատրել, թե ինչու է pageable փոխանցումը pinned-ից դանդաղ նույն քանակի բայթերի դեպքում
-- Չափել փոխանցման bandwidth-ը և համեմատել device-ի սեփական հիշողության bandwidth-ի հետ
-- Nsight Systems-ով տեսնել, թե հիշողության ընտրությունն ինչպես է երևում timeline-ի վրա
+- Տարբերել pageable, pinned, page-locked, mapped և unified հիշողությունը և նշել ամեն մեկի API-ն
+- Բացատրել, թե ինչու է pageable հիշողությունից փոխանցումն ավելի դանդաղ, քան pinned հիշողությունից, երբ բայթերի քանակը նույնն է
+- Չափել փոխանցման bandwidth-ը և համեմատել այն device-ի հիշողության bandwidth-ի հետ
+- Nsight Systems-ի timeline-ում տեսնել, թե ինչպես է ազդում հիշողության տեսակի ընտրությունը
 
 ## Հիմնական հասկացություններ
-- Paged հիշողություն (`malloc`), pinned հիշողություն (`cudaMallocHost`), տեղում page locking (`cudaHostRegister`)
-- Mapped, այսինքն՝ zero-copy հիշողություն (`cudaHostAlloc`՝ `cudaHostAllocMapped`-ով)
+- Pageable հիշողություն (`malloc`), pinned հիշողություն (`cudaMallocHost`), արդեն հատկացված հիշողության page-lock (`cudaHostRegister`)
+- Mapped (zero-copy) հիշողություն (`cudaHostAlloc`՝ `cudaHostAllocMapped` flag-ով)
 - Unified հիշողություն (`cudaMallocManaged`, `__managed__`) և page migration
-- DMA և ինչու է այն պահանջում pinned էջեր
+- DMA, և ինչու է այն պահանջում pinned էջեր
 - PCIe-ի և NVLink-ի bandwidth-ը՝ համեմատած device-ի հիշողության bandwidth-ի հետ
 
 ## Սահմանումներ
-**Pageable հիշողություն** — Սովորական host հիշողություն՝ `malloc`-ից կամ `new`-ից։ Օպերացիոն համակարգը կարող է տեղափոխել կամ swap անել դրա էջերը, ուստի GPU-ն ուղիղ չի կարող դիմել. փոխանցումը նախ պատճենում է այն driver-ի պահած page-locked միջանկյալ բուֆեր։
+**Pageable հիշողություն** — Սովորական host հիշողություն, որը հատկացվում է `malloc`-ով կամ `new`-ով։ Օպերացիոն համակարգը կարող է դրա էջերը տեղափոխել կամ swap անել, ուստի GPU-ն չի կարող ուղիղ դիմել դրանց։ Փոխանցման ժամանակ տվյալները նախ պատճենվում են driver-ի page-locked միջանկյալ բուֆեր։
 
-**Page-locked հիշողություն** — Host-ի հիշողություն, որի էջերը օպերացիոն համակարգը իրավունք չունի տեղափոխել կամ swap անել։
+**Page-locked հիշողություն** — Host-ի հիշողություն, որի էջերը օպերացիոն համակարգը չի կարող տեղափոխել կամ swap անել։
 
-**Pinned հիշողություն** — `cudaMallocHost`-ով հատկացված page-locked host հիշողություն, որպեսզի GPU-ն այն փոխանցի DMA-ով՝ առանց միջանկյալ պատճենի։ Պարտադիր է, որպեսզի `cudaMemcpyAsync`-ը իրոք ասինխրոն լինի։
+**Pinned հիշողություն** — `cudaMallocHost`-ով հատկացված page-locked host հիշողություն։ GPU-ն այն փոխանցում է DMA-ով՝ առանց միջանկյալ պատճենի։ Անհրաժեշտ է, որպեսզի `cudaMemcpyAsync`-ը իրոք ասինխրոն լինի։
 
-**`cudaHostRegister`** — Page-lock է անում սովորական ձևով հատկացված հիշողությունը՝ տալով նրան pinned հիշողության փոխանցման հատկությունները, առանց վերահատկացնելու։ `cudaHostUnregister`-ը հետ է շրջում այս ամենը։
+**`cudaHostRegister`** — Արդեն հատկացված սովորական հիշողությունը դարձնում է page-locked՝ առանց վերահատկացման։ Դրանից հետո այն փոխանցվում է այնպես, ինչպես pinned հիշողությունը։ `cudaHostUnregister`-ը չեղարկում է այս գործողությունը։
 
-**Mapped (zero-copy) հիշողություն** — Page-locked host հիշողություն, որն ունի նաև device-ի հասցե՝ `cudaHostAlloc`-ից `cudaHostAllocMapped`-ով։ Kernel-ը կարդում և գրում է այն ուղիղ, կապի վրայով, առանց բացահայտ պատճենի՝ ամեն դիմումին վճարելով կապի latency-ն։
+**Mapped (zero-copy) հիշողություն** — Page-locked host հիշողություն, որն ունի նաև device-ի հասցե։ Հատկացվում է `cudaHostAlloc`-ով՝ `cudaHostAllocMapped` flag-ով։ Kernel-ը այն կարդում և գրում է ուղիղ host-device կապով, առանց բացահայտ պատճենի, բայց ամեն դիմում կրում է կապի latency-ն։
 
-**Unified հիշողություն** — Մեկ հատկացում՝ `cudaMallocManaged`, հասցեագրելի և host-ից, և device-ից, և driver-ը էջերը տեղափոխում է նրանց միջև ըստ պահանջի։
+**Unified հիշողություն** — Մեկ հատկացում (`cudaMallocManaged`), որը հասցեագրելի է և՛ host-ից, և՛ device-ից։ Driver-ը էջերը տեղափոխում է նրանց միջև, երբ դրանք պահանջվում են։
 
-**Page migration** — Unified հիշողության էջի տեղափոխումն այն պրոցեսորին, որը դրա վրա fault է տվել։ Երկու ուղղությամբ կրկնվող տեղափոխումը unified հիշողության դանդաղության սովորական պատճառն է. կառավարվում է `cudaMemPrefetchAsync`-ով և `cudaMemAdvise`-ով։
+**Page migration** — Unified հիշողության էջի տեղափոխումն այն պրոցեսորի հիշողություն, որը դիմել է էջին և ստացել page fault։ Էջերի կրկնվող տեղափոխումը երկու ուղղությամբ unified հիշողության դանդաղության սովորական պատճառն է։ Տեղափոխումը կառավարվում է `cudaMemPrefetchAsync`-ով և `cudaMemAdvise`-ով։
 
-**DMA (Direct Memory Access)** — Փոխանցում, որը կատարում է copy engine-ը՝ առանց CPU-ի տվյալները շարժելու։ Պահանջում է, որ host-ի էջերը page-locked լինեն, և հենց դրա համար են pinned փոխանցումներն ավելի արագ։
+**DMA (Direct Memory Access)** — Փոխանցում, որը կատարում է copy engine-ը, և CPU-ն չի մասնակցում տվյալների տեղափոխմանը։ DMA-ն պահանջում է, որ host-ի էջերը page-locked լինեն։ Հենց դրա համար են pinned հիշողությունից փոխանցումներն ավելի արագ։
 
-**PCIe** — Host-ը և device-ը միացնող bus-ը համակարգերի մեծ մասում։ Նրա bandwidth-ը մեկ կարգով ցածր է device-ի հիշողության bandwidth-ից։
+**PCIe** — Bus, որը համակարգերի մեծ մասում միացնում է host-ը և device-ը։ Դրա bandwidth-ը առնվազն մեկ կարգով ցածր է device-ի հիշողության bandwidth-ից։
 
-**NVLink** — NVIDIA-ի ուղիղ GPU-GPU կապը, որոշ համակարգերում նաև CPU-GPU, PCIe-ից մի քանի անգամ մեծ bandwidth-ով։
+**NVLink** — NVIDIA-ի ուղիղ կապը GPU-ների միջև, որոշ համակարգերում նաև CPU-ի և GPU-ի միջև։ Դրա bandwidth-ը մի քանի անգամ մեծ է PCIe-ի bandwidth-ից։
 
-**Հիշողության bandwidth** — Բայթ վայրկյանում SM-երի և device-ի հիշողության միջև։ Տեսական peak-ը bus width-ն է բազմապատկած հիշողության clock-ով և մեկ clock-ի փոխանցումների քանակով. հասած թիվը այն է, ինչին kernel-ն իրականում հասնում է։
+**Հիշողության bandwidth** — SM-ների և device-ի հիշողության միջև վայրկյանում փոխանցվող բայթերի քանակը։ Տեսական peak-ը հավասար է bus width-ի, հիշողության clock-ի և մեկ clock-ում փոխանցումների քանակի արտադրյալին։ Հասած bandwidth-ը այն է, ինչ kernel-ը իրականում ստանում է։
 
-## Այն թիվը, որ նշանակություն ունի
-Device-ի հիշողության bandwidth-ը հարյուրավոր GB/s-ից մինչև մի քանի TB/s է։ PCIe-ն մեկ կարգ ցածր է։ Այն kernel-ը, որը փոխանցում է իր մուտքը, մեկ անգամ հաշվում է դրա վրայով և արդյունքը հետ փոխանցում, սահմանափակված է կապով, ոչ թե GPU-ով։ Սա առաջին բանն է, որ պետք է ստուգել, երբ GPU տեղափոխված kernel-ը հիասթափեցնում է, և հենց սրա համար են stream-երը գոյություն ունեն (Օր 8)։
+## Ֆունկցիաներ
+
+```c
+// Pinned հիշողության հատկացում և ազատում host-ում
+cudaError_t cudaMallocHost(void **ptr, size_t size);
+cudaError_t cudaFreeHost(void *ptr);
+
+// Արդեն հատկացված հիշողությունը դարձնում է page-locked և չեղարկում դա
+cudaError_t cudaHostRegister(void *ptr, size_t size, unsigned int flags);
+cudaError_t cudaHostUnregister(void *ptr);
+
+// Pinned հիշողություն flags-ով։ cudaHostAllocMapped flag-ը տալիս է mapped (zero-copy) հիշողություն
+cudaError_t cudaHostAlloc(void **pHost, size_t size, unsigned int flags);
+
+// Unified հիշողության հատկացում
+cudaError_t cudaMallocManaged(void **devPtr, size_t size, unsigned int flags = cudaMemAttachGlobal);
+
+// Unified հիշողության էջերը նախապես տեղափոխում է dstDevice-ի հիշողություն
+cudaError_t cudaMemPrefetchAsync(const void *devPtr, size_t count, int dstDevice, cudaStream_t stream = 0);
+
+// Driver-ին հայտնում է, թե ինչպես են օգտագործվելու unified հիշողության էջերը
+cudaError_t cudaMemAdvise(const void *devPtr, size_t count, enum cudaMemoryAdvise advice, int device);
+
+// Սինխրոն և ասինխրոն պատճենում
+cudaError_t cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind);
+cudaError_t cudaMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind,
+                            cudaStream_t stream = 0);
+```
+
+## Ամենակարևոր համեմատությունը
+Device-ի հիշողության bandwidth-ը հարյուրավոր GB/s-ից մինչև մի քանի TB/s է։ PCIe-ի bandwidth-ը առնվազն մեկ կարգով ցածր է։ Եթե kernel-ը փոխանցում է մուտքային տվյալները, դրանց վրա կատարում է ընդամենը մեկ հաշվարկ և արդյունքը հետ է փոխանցում, ծրագրի ժամանակը որոշում է կապը, ոչ թե GPU-ն։ Երբ GPU-ի վրա տեղափոխված կոդը չի արագանում, առաջին հերթին պետք է ստուգել սա։ Հենց այս խնդրի համար են նախատեսված stream-երը (Օր 8)։
 
 ## Պատկեր
-![Host-ից device փոխանցման չորս ճանապարհ՝ pageable միջանկյալ պատճենով, pinned ուղիղ DMA-ով, mapped, որտեղ GPU-ն ուղիղ կարդում է host-ի հիշողությունը, unified, որտեղ runtime-ը տեղափոխում է էջերը](memory_types.svg)
+![Host-ից device փոխանցման չորս ճանապարհ. pageable (միջանկյալ պատճենով), pinned (ուղիղ DMA-ով), mapped (GPU-ն ուղիղ կարդում է host-ի հիշողությունը) և unified (runtime-ը տեղափոխում է էջերը)](memory_types.svg)
 
-Հիշողության ամեն տեսակ նույն հարցի այլ պատասխան է՝ ինչպես են տվյալները host-ի RAM-ից հասնում device-ի VRAM։ Pageable հիշողությունը պահանջում է թաքնված միջանկյալ պատճեն, pinned-ը՝ ոչ։ Mapped-ը պատճենն ամբողջությամբ հանում է և փոխարենը վճարում ամեն դիմումի latency-ն։ Unified-ը որոշումը թողնում է runtime-ին։
+Հիշողության ամեն տեսակ տարբեր կերպ է պատասխանում նույն հարցին. ինչպես են տվյալները host-ի RAM-ից հասնում device-ի VRAM։ Pageable հիշողությունը պահանջում է թաքնված միջանկյալ պատճեն, pinned-ը՝ ոչ։ Mapped հիշողությունն ընդհանրապես պատճեն չի պահանջում, բայց ամեն դիմում կրում է կապի latency-ն։ Unified հիշողության դեպքում որոշումը կայացնում է runtime-ը։
 
 ## Գրականություն
 - [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 3.2.2. Device Memory · 3.2.6. Page-Locked Host Memory · 19. Unified Memory Programming
@@ -50,22 +79,22 @@ Device-ի հիշողության bandwidth-ը հարյուրավոր GB/s-ից �
 - Nsight Systems — User Guide
 
 ## Լաբորատոր առաջադրանք
-Բարելավել Օր 2-ի և Օր 3-ի վեկտորների գումարումը pinned հիշողությամբ, և երկուսը համեմատել Nsight Systems-ում։
+Վեկտորների գումարման ծրագիրը (Օր 2, Օր 3) փոխել այնպես, որ այն օգտագործի pinned հիշողություն, և երկու տարբերակը համեմատել Nsight Systems-ում։
 
 ## Ինքնուրույն աշխատանք
-1. Չափել `cudaMemcpy`-ը pageable և pinned host հիշողությամբ՝ փոխանցման մի քանի չափի համար։ Կառուցել bandwidth-ի կախվածությունը չափից։
-2. Գոյություն ունեցող pageable բուֆերը page-lock անել `cudaHostRegister`-ով՝ նախապես pinned հիշողություն հատկացնելու փոխարեն, և համեմատել։
-3. Վերագրել վեկտորների գումարումը `cudaMallocManaged`-ով և համեմատել և՛ կոդի բարդությունը, և՛ արագագործությունը։
-4. Բոլոր երեք տարբերակը profile անել Nsight Systems-ով և համեմատել փոխանցումների timeline-ները։
-5. Հաշվել ձեր վեկտորների գումարման arithmetic intensity-ն և Օր 1-ին հավաքած թվերից որոշել՝ kernel-ն է սահմանափակումը, թե փոխանցումը։
+1. Չափել `cudaMemcpy`-ի ժամանակը pageable և pinned host հիշողության դեպքում՝ փոխանցման մի քանի չափի համար։ Կառուցել bandwidth-ի կախվածությունը փոխանցման չափից։
+2. Արդեն հատկացված pageable բուֆերը դարձնել page-locked `cudaHostRegister`-ով՝ նոր pinned հիշողություն հատկացնելու փոխարեն, և համեմատել արդյունքները։
+3. Վեկտորների գումարումը վերագրել `cudaMallocManaged`-ով և համեմատել և՛ կոդի բարդությունը, և՛ արագագործությունը։
+4. Երեք տարբերակն էլ profile անել Nsight Systems-ով և համեմատել փոխանցումների timeline-ները։
+5. Հաշվել վեկտորների գումարման arithmetic intensity-ն և Օր 1-ում ստացած թվերով որոշել, թե ինչն է սահմանափակում արագությունը՝ kernel-ը, թե փոխանցումը։
 
 ## Ինքնաստուգում
 Պատասխանները տրված չեն։
 
-1. Ինչու՞ է pageable-ից device պատճենը pinned-ից դանդաղ, եթե նույն քանակի բայթ է շարժվում։
-2. Ի՞նչ արժե համակարգի համար host-ի մեծ ծավալի հիշողություն pin անելը։
-3. Ե՞րբ է zero-copy հիշողությունը գերազանցում նախ device պատճենելուն։
-4. Unified հիշողությունը սկզբնական կոդից հանում է բացահայտ պատճենը։ Փոխանցո՞ւմն էլ է հանում։
+1. Ինչու՞ է pageable հիշողությունից device պատճենելն ավելի դանդաղ, քան pinned հիշողությունից, եթե փոխանցվում է նույն քանակի բայթ։
+2. Ի՞նչ գին ունի համակարգի համար host-ի մեծ ծավալի հիշողություն pin անելը։
+3. Ե՞րբ է zero-copy հիշողությունն ավելի արագ, քան տվյալները նախ device պատճենելը։
+4. Unified հիշողությունը կոդից հանում է բացահայտ պատճենը։ Փոխանցումն էլ է վերանո՞ւմ։
 
 ## Կոդի template
 Տես [`template.cu`](template.cu)։
