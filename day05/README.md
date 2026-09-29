@@ -1,8 +1,8 @@
 # Օր 5. Shared memory-ն և bank conflict-ները
 
 ## Նպատակներ
-- Բացատրել, թե ինչպես է shared memory-ն բաժանված bank-երի և ինչպես է առաջանում bank conflict-ը
-- Ճիշտ սինխրոնացնել shared memory-ին դիմումները և բացատրել, թե ինչ է երաշխավորում `__syncthreads()`-ը և ինչ՝ ոչ
+- Նկարագրել, թե ինչպես է shared memory-ն բաժանված bank-երի և ինչպես է առաջանում bank conflict-ը
+- Ճիշտ սինխրոնացնել shared memory-ին դիմումները և նկարագրել, թե ինչ է երաշխավորում `__syncthreads()`-ը և ինչ՝ ոչ
 - Տարբերել global, shared, constant և pitched հիշողությունը և ընտրել դրանցից համապատասխանը
 - Իրականացնել tiled 2D ֆիլտր և հեռացնել դրա bank conflict-ները
 

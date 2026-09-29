@@ -2,7 +2,7 @@
 
 ## Նպատակներ
 - Բաժանել աշխատանքը thread-երի, block-երի և grid-ի միջև՝ 1D և 2D տվյալների համար
-- Գրել global index-ի բանաձևը և բացատրել, թե ինչու այն ունի հենց այդ տեսքը
+- Գրել global index-ի բանաձևը և նկարագրել, թե ինչու այն ունի հենց այդ տեսքը
 - Տարբերել coalesced և uncoalesced ինդեքսավորումը, և ինդեքսավորել այնպես, որ warp-ը դիմի հաջորդական հասցեների
 - Ընտրել block size և ստուգել ընտրությունը `cudaOccupancyMaxActiveBlocksPerMultiprocessor`-ով
 - Գրել grid-stride loop, որը ճիշտ է աշխատում մուտքի ցանկացած չափի դեպքում՝ նույն launch configuration-ով
