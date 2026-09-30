@@ -51,7 +51,7 @@ See [GLOSSARY.md](GLOSSARY.md) if a term is unfamiliar, [PERFORMANCE.md](PERFORM
 ## Day 6 — Coalescing, caches and bandwidth
 61. Add `__ldg()` to a read-heavy kernel from an earlier day and measure the effect.
 62. Implement `col ^ row` swizzling to remove bank conflicts without a padding column.
-63. Experiment with L2 persistence hints (`cudaAccessPolicyWindow`) on a repeatedly-read buffer.
+63. In one kernel, read a large input once and a small table many times; load the input with a plain load, then with `__ldcs`, and compare the table's L1 hit rate in Nsight Compute.
 64. Optimise the image transform kernel (task 28) using every technique from the course so far.
 65. Benchmark `__ldg`, swizzling, and padding on the same kernel and rank them for your GPU.
 65a. Add achieved-bandwidth and %-of-peak output to all three timings in `day06/template.cu`, and decide from the numbers whether the day’s optimisations ever had room to help.
@@ -115,7 +115,7 @@ Tasks that need only what the course covers, applied to problems it does not wor
 83. Implement alpha blending of two images on the GPU.
 84. Implement an RGB-to-HSV color-space conversion kernel.
 86. Implement non-maximum suppression for corner detection.
-87. Build a real-time webcam filter pipeline: `cv::VideoCapture` → GPU kernel → `cv::imshow`.
+87. Process every image in `data/` in one program: `load_bmp` → GPU filter → `save_bmp`, overlapping the GPU work on one image with the file I/O of the next.
 88. Implement a full Laplacian pyramid blend of two images.
 89. Implement a separable box filter (horizontal pass, then vertical) and compare it to a single 2D tiled pass.
 90. Implement template matching (normalized cross-correlation) on the GPU.

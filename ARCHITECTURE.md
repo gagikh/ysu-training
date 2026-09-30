@@ -80,7 +80,7 @@ Every cache described in this document — L1, L2, texture, constant — is fini
 
 You can influence this beyond hoping the LRU approximation guesses right, at two different granularities:
 
-**Region-level: `cudaAccessPolicyWindow` (Day 6).** Marks a whole address range as `cudaAccessPropertyPersisting` (bias the policy to *keep* it, resist eviction) or `cudaAccessPropertyStreaming` (bias it to *evict first*). The tool for "this buffer gets read every iteration of my loop — don't let a one-off read evict it."
+**Region-level: `cudaAccessPolicyWindow` (not covered in this course).** Marks a whole address range as `cudaAccessPropertyPersisting` (bias the policy to *keep* it, resist eviction) or `cudaAccessPropertyStreaming` (bias it to *evict first*). The tool for "this buffer gets read every iteration of my loop — don't let a one-off read evict it."
 
 **Instruction-level: load/store cache operators.** Every individual global load or store can carry its own cache hint, exposed as intrinsics — finer-grained than a whole-buffer policy window, down to a single access:
 
@@ -110,7 +110,7 @@ A practical pattern from this week's material: in a kernel like Day 6's `tiled_f
 
 **Texture cache.** A third small, read-only, per-SM cache, distinct from both L1 and constant cache — this is what `tex2D` fetches actually hit. On Kepler and newer, it's unified with the same "read-only data cache" path that `__ldg()` uses (see the instruction table above), so a plain `__ldg()`'d pointer and an actual bound texture object can end up sharing the same physical cache. What earns it a separate name from L1: it's tuned for **2D/3D spatial locality** rather than linear coalescing. A fetch at `(x, y)` and a nearby fetch at `(x+1, y+1)` hit this cache well even though those two addresses aren't contiguous in linear memory — exactly the access pattern a zoom or rotate kernel has, and precisely what a cache built for coalesced linear access (L1) doesn't handle as gracefully. The **texture unit** sitting in front of this cache is also where the bilinear filtering and address-mode (clamp/wrap/mirror) hardware physically lives — the cache alone doesn't interpolate anything; the unit does that on the way out.
 
-**L2 cache & atomics.** Unlike shared memory/L1/constant/texture caches, L2 is a single cache shared by *every* SM on the chip, sitting between all the SMs and global memory (`l2CacheSize` in `report_device_capabilities()`; `persistingL2CacheMaxSize` is the portion you can pin with the `cudaAccessPolicyWindow` hints from Day 6, and it uses the same approximate-LRU replacement policy — biased by that policy window — as L1). L2 also contains dedicated ALUs for atomic read-modify-write operations — when you call `atomicAdd` (Day 7), the operation is actually resolved at L2, not bounced back to the issuing SM's own ALUs. That's *why* heavy atomic contention on a single address is slow: every SM's atomic requests to that address funnel through the same L2 slice and serialize there, regardless of how many SMs are trying.
+**L2 cache & atomics.** Unlike shared memory/L1/constant/texture caches, L2 is a single cache shared by *every* SM on the chip, sitting between all the SMs and global memory (`l2CacheSize` in `report_device_capabilities()`; `persistingL2CacheMaxSize` is the portion you can pin with the `cudaAccessPolicyWindow` hints (not covered in this course), and it uses the same approximate-LRU replacement policy — biased by that policy window — as L1). L2 also contains dedicated ALUs for atomic read-modify-write operations — when you call `atomicAdd` (Day 7), the operation is actually resolved at L2, not bounced back to the issuing SM's own ALUs. That's *why* heavy atomic contention on a single address is slow: every SM's atomic requests to that address funnel through the same L2 slice and serialize there, regardless of how many SMs are trying.
 
 **Global memory (VRAM).** Off-chip DRAM, the largest and slowest space, visible to every SM through L2. Everything you `cudaMalloc` lives here. This is the "Device" memory in Day 1's host/device picture.
 
@@ -125,16 +125,16 @@ A practical pattern from this week's material: in a kernel like Day 6's `tiled_f
 | `regsPerMultiprocessor` / `regsPerBlock` | Register file size — the budget behind register spilling and occupancy |
 | `sharedMemPerBlock` / max shared mem per SM | Shared memory / L1 budget (Day 5, Day 6) |
 | `totalConstMem` | Constant memory size (and indirectly, headroom for kernel parameters) |
-| `l2CacheSize` / `persistingL2CacheMaxSize` | L2 cache size and how much of it you can pin (Day 6) |
+| `l2CacheSize` / `persistingL2CacheMaxSize` | L2 cache size and how much of it can be reserved for persisting accesses (not covered in this course) |
 | `warpSize` | Threads per warp — almost always 32, never hardcode it anyway |
 | `maxThreadsPerMultiProcessor` | Ceiling on resident warps per SM — the other half of the occupancy equation |
-| `singleToDoublePrecisionPerfRatio` | How many FP32 units exist per FP64 unit |
+| `singleToDoublePrecisionPerfRatio` ‡ | How many FP32 units exist per FP64 unit |
 | tensor cores per SM † | Whether/how much cuBLAS-style matrix hardware you have (Day 9) |
-| `memoryClockRate` / `memoryBusWidth` ‡ | Theoretical global-memory bandwidth — the ceiling nothing beats |
+| `memoryClockRate` ‡ / `memoryBusWidth` | Theoretical global-memory bandwidth — the ceiling nothing beats |
 
 † Not a `cudaDeviceProp` field. `device_info.h` derives this from a hardcoded compute-capability table, unlike every other row here, which is queried from the driver.
 
-‡ Both deprecated in CUDA 12+ (still functional, but they warn). The modern spellings are `cudaDeviceGetAttribute(&v, cudaDevAttrMemoryClockRate, dev)` and `cudaDevAttrGlobalMemoryBusWidth`.
+‡ Removed from `cudaDeviceProp` in CUDA 13. `device_info.h` reads them with `cudaDeviceGetAttribute` (`cudaDevAttrMemoryClockRate`, `cudaDevAttrSingleToDoublePrecisionPerfRatio`), which works in both CUDA 12 and 13.
 
 Texture cache size specifically isn't exposed through `cudaDeviceProp` the way the others are — NVIDIA doesn't publish it as a queryable attribute, so there's no row for it here.
 
@@ -142,6 +142,6 @@ Texture cache size specifically isn't exposed through `cudaDeviceProp` the way t
 - **Day 1** — `report_device_capabilities()` surfaces the raw numbers this document explains; `--keep` and `-Xptxas -v` are how you inspect the PTX/SASS discussed above.
 - **Day 3** — warp scheduling and the instruction pipeline (fetch from I-cache, dispatch to a partition) are the *behavior*; this document is the *hardware* behind it.
 - **Day 4** — pinned/unified memory is about the host↔device link; this document is what's on the far side of that link, inside the device.
-- **Day 5, Day 6** — shared memory, bank conflicts, `__ldg`, LRU/cache-operator hints, and L2 persistence hints are all techniques for working *with* the memory organization described here, not around it.
-- **Day 7, Day 7, Day 5** — `__shfl_*`, `__ballot_sync`, `__popc`, and `atomicAdd` are all single instructions once you get past the intrinsic wrapper — the instruction table above shows what they actually compile to.
+- **Day 5, Day 6** — shared memory, bank conflicts, `__ldg`, and LRU/cache-operator hints are all techniques for working *with* the memory organization described here, not around it.
+- **Day 7** — `__shfl_*`, `__ballot_sync`, `__popc`, and `atomicAdd` are all single instructions once you get past the intrinsic wrapper — the instruction table above shows what they actually compile to.
 - **Texture objects** (not covered in this course) — texture sampling and bilinear filtering are backed by the texture cache and texture unit described above, not by L1.

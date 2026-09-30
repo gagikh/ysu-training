@@ -87,7 +87,7 @@
   <div class="caption">Each "request" is a load issued by a warp. Most resolve close to the SM (fast); a
   minority miss all the way to global memory, which is ~15&times; slower than L1 — this is the same
   pyramid as <code>cache_hierarchy.svg</code>, but now you can see <i>where</i> traffic actually lands.
-  `__ldg()`, L2 persistence hints, and shared-memory swizzling (this day) are all about biasing more
+  `__ldg()` and the load/store cache operators (this day) are both about biasing more
   requests toward the top of this pyramid.</div>
 </div>
 
