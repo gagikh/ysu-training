@@ -26,7 +26,7 @@
 | [5](day05/README.md) | Shared memory-ն և bank conflict-ները |
 | [6](day06/README.md) | Coalescing-ը, cache-երը և bandwidth-ը |
 | [7](day07/README.md) | Warp intrinsic-ները, reduction-ը և atomic-ները |
-| [8](day08/README.md) | Stream-երը, event-ները, ասինխրոնությունը և CUDA graph-երը |
+| [8](day08/README.md) | Stream-երը, event-ները, ասինխրոնությունը և CUDA graph-ները |
 | [9](day09/README.md) | Գրադարանները, tensor core-երը և ճշգրտությունը |
 | [10](day10/README.md) | Առաջարկների քննարկում |
 
@@ -41,13 +41,13 @@
 | 5 | Shared memory, bank-եր, conflict-ներ, tiling | Tiled 2D ֆիլտր halo-ով, ապա Sobel |
 | 6 | Coalescing, sector-ներ, L1/L2, coarsening | Օր 5-ի ֆիլտրի օպտիմալացում, արդյունքը՝ peak bandwidth-ի տոկոսով |
 | 7 | Warp shuffle, reduction, scan, atomic-ներ | Պատկերի միջին արժեքը warp reduction-ով, histogram՝ global atomic-ներով և privatisation-ով |
-| 8 | Stream-եր, event-ներ, ասինխրոն պատճենում, CUDA graph-եր | Մասերով pipeline մի քանի stream-ում, ապա նույնը՝ graph-ի տեսքով |
+| 8 | Stream-եր, event-ներ, ասինխրոն պատճենում, CUDA graph-ներ | Մասերով pipeline մի քանի stream-ում, ապա նույնը՝ graph-ի տեսքով |
 | 9 | cuBLAS, cuDNN, tensor core-եր, ճշգրտություն | Ձեռքով գրված kernel-ների փոխարինում գրադարանային կանչերով, tensor core-երի միացում |
 | 10 | Քննարկում | Մասնակիցները ներկայացնում են իրենց առաջարկները |
 
 Ամեն օրվա թղթապանակում կա այդ օրվա `README.md`-ն և `template.cu`-ն, որից սկսվում է աշխատանքը։ Ընդհանուր օժանդակ ֆայլերը [`common/`](common) թղթապանակում են՝ `cuda_check.h`, `device_info.h`, `timer.h`, `image_io.h`, `bmp_utilities.h`։
 
-Դասընթացում ընդգրկված չեն textures և surfaces, stream-ordered memory allocation, մի քանի GPU-ով աշխատանքը և մի քանի node-ով MPI-ը։ Առաջին երկուսն ընդգրկված են [ուսանողների դասընթացում](https://github.com/gagikh/cuda)։
+Դասընթացում ընդգրկված չեն textures և surfaces, stream-ordered memory allocation, մի քանի GPU-ով աշխատանքը և մի քանի node-ով MPI-ը։
 
 ## Դասընթացի հիմնական գաղափարը
 
