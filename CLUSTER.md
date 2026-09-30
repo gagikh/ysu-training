@@ -6,28 +6,15 @@
 ssh <user>@<cluster>
 ```
 
-## Միջավայրի կարգավորում (մեկ անգամ)
-
-`~/.bashrc` ֆայլում ավելացնել հետևյալ տողը.
-
-```bash
-export PATH="$PATH":/mnt/weka/shared-cache/miniforge3/envs/indoorolo/bin
-```
-
-Կամ նույնը կատարել հրամանով և ստուգել արդյունքը.
-
-```bash
-echo 'export PATH="$PATH":/mnt/weka/shared-cache/miniforge3/envs/indoorolo/bin' >> ~/.bashrc
-source ~/.bashrc
-nvcc --version          # release 12.8
-```
-
-## Դասընթացի նյութերը
+## Դասընթացի նյութերը և միջավայրը (մեկ անգամ)
 
 ```bash
 git clone https://github.com/gagikh/ysu-training.git
 cd ysu-training
+source setup.sh         # release 12.8
 ```
+
+`setup.sh`-ը `~/.bashrc`-ում ավելացնում է CUDA 12.8-ի `PATH`-ը (եթե այն արդեն չկա) և միանգամից փոխում է ընթացիկ terminal-ի `PATH`-ը։ Այն պետք է կանչել `source`-ով, ոչ թե `bash`-ով, այլապես ընթացիկ terminal-ի `PATH`-ը չի փոխվի։
 
 ## Առաջին ստուգումը
 
