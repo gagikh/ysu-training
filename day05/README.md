@@ -74,7 +74,7 @@ Shared memory-ն բաժանված է 32 bank-ի, որպեսզի warp-ի դիմո
 Կարգավորելի տարբերակը՝ [`bank_conflict_animations.html`](bank_conflict_animations.html)։ Այնտեղ կարելի է ընտրել ցանկացած stride 1-ից 33, gather-ի ցանկացած աստիճան, հետևել ամեն lane-ի գծին և դիտել transpose-ի կարդալու և գրելու փուլերը plain, padded և swizzled դասավորությունների դեպքում։ Ֆայլը պետք է բացել browser-ով տեղական պատճենից։
 
 ## Գրականություն
-- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 3.2.4. Shared Memory
+- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/archive/12.8.0/pdf/CUDA_C_Programming_Guide.pdf) — 6.2.4. Shared Memory
 - CUDA C++ Best Practices Guide — Shared Memory
 - Bank conflict-ի գծապատկերները տե՛ս վերևի «Պատկեր» և «Անիմացիա» բաժիններում, stride-երի ինտերակտիվ հետազոտիչը՝ [`bank_conflict_animations.html`](bank_conflict_animations.html)
 

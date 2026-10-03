@@ -92,7 +92,7 @@ Padding-ը (Օր 5) հեռացնում է bank conflict-ները մեկ լրաց
 Քայլ առ քայլ տարբերակը, որտեղ հարցումները կարելի է ուղարկել ձեռքով, [`memory_animations.html`](memory_animations.html) ֆայլում է։ Ֆայլը պետք է բացել browser-ով տեղական պատճենից։
 
 ## Գրականություն
-- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 5. Performance Guidelines
+- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/archive/12.8.0/pdf/CUDA_C_Programming_Guide.pdf) — 8. Performance Guidelines
 - CUDA C++ Best Practices Guide — Coalesced Access to Global Memory, L2 Cache
 - Nsight Compute — Profiling Guide, memory chart և sectors per request
 - Williams S., Waterman A., Patterson D. Roofline: An Insightful Visual Performance Model. *CACM* 52(4), 2009

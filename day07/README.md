@@ -123,7 +123,7 @@ Shuffle-ները տվյալները տեղափոխում են ռեգիստրից
 Նույն ութ lane-ն երեք տարբեր intrinsic-ի դեպքում։ `__shfl_down_sync`-ը և `__shfl_up_sync`-ն արժեքները տեղաշարժում են մեկ ուղղությամբ՝ ֆիքսված offset-ով։ `__shfl_xor_sync`-ն արժեքները փոխանակում է lane-երի զույգերի միջև (`i` և `i ^ laneMask`), ուստի մեկ հրամանով ամեն lane և՛ ուղարկում է, և՛ ստանում։ Այդ պատճառով այն օգտագործվում է butterfly reduction-ում։
 
 ## Գրականություն
-- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 7.22. Warp Shuffle Functions · 7.14. Atomic Functions · 8. Cooperative Groups
+- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/archive/12.8.0/pdf/CUDA_C_Programming_Guide.pdf) — 10.22. Warp Shuffle Functions · 10.14. Atomic Functions · 11. Cooperative Groups
 - [`INTRINSICS.md`](../INTRINSICS.md) — shuffle, vote, բիթային գործողություններ և atomic-ներ՝ մեկ աղյուսակում
 - CUB-ի device-wide reduction և scan՝ https://nvidia.github.io/cccl/cub/
 

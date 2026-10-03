@@ -66,7 +66,7 @@ CPU-ն հիշողության latency-ն փոքրացնում է cache-երի խ
 Քայլ առ քայլ տարբերակը՝ [`warp_animations.html`](warp_animations.html)։ Ֆայլը պետք է բացել browser-ով տեղական պատճենից, քանի որ GitHub-ը HTML-ը ցույց է տալիս որպես տեքստ և չի գործարկում։
 
 ## Գրականություն
-- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 4. Hardware Implementation · 5. Performance Guidelines
+- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/archive/12.8.0/pdf/CUDA_C_Programming_Guide.pdf) — 7. Hardware Implementation · 8. Performance Guidelines
 - [Nsight Compute Kernel Profiling Guide](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html) — 2.3.1. Hardware Model։ Վերևում օգտագործված active, eligible և stalled վիճակները վերցված են այստեղից
 - Oxford-ի CUDA դասընթացը, lecture 3՝ https://people.maths.ox.ac.uk/~gilesm/cuda/lecs/lec3.pdf
 - Using CUDA warp-level primitives՝ https://developer.nvidia.com/blog/using-cuda-warp-level-primitives/

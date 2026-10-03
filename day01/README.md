@@ -97,7 +97,7 @@ Host-ը և device-ն երկու առանձին address space են, որոնք մ
 Device-ի ճանապարհը մինչև մեքենայական կոդը չորս քայլ է, host-ինը՝ երկու։ Host-ի մասը սպասում է linker-ում, քանի որ binary-ն կարելի է կառուցել միայն այն ժամանակ, երբ երկու մասն էլ պատրաստ են։ PTX-ում է ամրագրվում virtual architecture-ը, SASS-ում՝ real-ը։
 
 ## Գրականություն
-- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 2. Programming Model · 4. Hardware Implementation · 16. Compute Capabilities
+- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/archive/12.8.0/pdf/CUDA_C_Programming_Guide.pdf) — 5. Programming Model · 7. Hardware Implementation · 19. Compute Capabilities
 - CUDA C++ Best Practices Guide — Assess, Parallelize, Optimize, Deploy
 - SM-ի կառուցվածքի գծապատկերը և անիմացիաները՝ [`sm_anatomy.svg`](../sm_anatomy.svg), [`sm_animations.html`](../sm_animations.html)
 - [`ARCHITECTURE.md`](../ARCHITECTURE.md) — SM-ի ներքին կառուցվածքի մանրամասն նկարագրություն (անգլերեն)

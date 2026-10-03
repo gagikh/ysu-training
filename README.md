@@ -80,7 +80,7 @@ sbatch submit.sh template data/camera.bmp    # Օր 5-9
 
 **Հիմնական**
 
-- NVIDIA. *CUDA C Programming Guide* (PDF) — https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf
+- NVIDIA. *CUDA C Programming Guide* (PDF) — https://docs.nvidia.com/cuda/archive/12.8.0/pdf/CUDA_C_Programming_Guide.pdf
   Դասընթացի հիմնական գրականությունը։ Ամեն օրվա «Գրականություն» բաժնում նշված են այդ պարապմունքի համար անհրաժեշտ գլուխները։
 - NVIDIA. *CUDA C++ Best Practices Guide* — https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/ (v13.4)
 - NVIDIA. *CUDA Programming Guide* (HTML, v13.4.2) — https://docs.nvidia.com/cuda/cuda-programming-guide/

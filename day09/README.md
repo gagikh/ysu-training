@@ -81,7 +81,7 @@ float atomicAdd(float *address, float val);
 Էքսպոնենտի դաշտը որոշում է տիրույթը, մանտիսը՝ ճշգրտությունը։ bf16-ը և tf32-ն ունեն fp32-ի 8-բիթանոց էքսպոնենտը, ուստի fp32-ում ներկայացվող արժեքը ներկայացվում է նաև դրանցում (ավելի ցածր ճշգրտությամբ)։ fp16-ի 5-բիթանոց էքսպոնենտի դեպքում այդպես չէ, և այդ պատճառով fp16-ով ուսուցումը պահանջում է loss scaling, իսկ bf16-ով՝ ոչ։ tf32-ը պահպանման ձևաչափ չէ. այն գոյություն ունի միայն որպես tensor core-ի մուտքային ձևաչափ, ուստի cuBLAS-ում այն միացվում է math mode-ով, ոչ թե տվյալների տիպով։
 
 ## Գրականություն
-- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 7.24. Warp Matrix Functions · 8. Cooperative Groups
+- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/archive/12.8.0/pdf/CUDA_C_Programming_Guide.pdf) — 10.24. Warp Matrix Functions · 11. Cooperative Groups
 - Train With Mixed Precision՝ https://docs.nvidia.com/deeplearning/performance/
 - Micikevicius P. et al. Mixed Precision Training. *ICLR*, 2018. arXiv:1710.03740
 - cuBLAS, cuFFT, cuRAND՝ https://docs.nvidia.com/cuda/ · cuDNN՝ https://docs.nvidia.com/deeplearning/cudnn/

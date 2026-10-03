@@ -86,7 +86,7 @@ cudaError_t cudaDeviceSynchronize(void);
 Graph-ները չեն արագացնում GPU-ի հաշվարկը։ Դրանք նվազեցնում են CPU-ի ծախսը, որը պահանջվում է launch-երի նույն հաջորդականությունն ամեն անգամ նորից ուղարկելու համար։ Սա նկատելի է միայն այն դեպքում, երբ ֆիքսված pipeline-ը կատարվում է շատ անգամ։
 
 ## Գրականություն
-- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 3.2.8. Asynchronous Concurrent Execution · 3.2.8.7. CUDA Graphs
+- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/archive/12.8.0/pdf/CUDA_C_Programming_Guide.pdf) — 6.2.8. Asynchronous Concurrent Execution · 6.2.8.7. CUDA Graphs
 - CUDA C++ Best Practices Guide — Asynchronous Transfers and Overlapping Transfers with Computation
 - Nsight Systems — User Guide, timeline view
 

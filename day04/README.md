@@ -74,7 +74,7 @@ Device-ի հիշողության bandwidth-ը հարյուրավոր GB/s-ից �
 Հիշողության ամեն տեսակ տարբեր կերպ է պատասխանում նույն հարցին. ինչպես են տվյալները host-ի RAM-ից հասնում device-ի VRAM։ Pageable հիշողությունը պահանջում է թաքնված միջանկյալ պատճեն, pinned-ը՝ ոչ։ Mapped հիշողությունն ընդհանրապես պատճեն չի պահանջում, բայց ամեն դիմում կրում է կապի latency-ն։ Unified հիշողության դեպքում որոշումը կայացնում է runtime-ը։
 
 ## Գրականություն
-- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 3.2.2. Device Memory · 3.2.6. Page-Locked Host Memory · 19. Unified Memory Programming
+- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/archive/12.8.0/pdf/CUDA_C_Programming_Guide.pdf) — 6.2.2. Device Memory · 6.2.6. Page-Locked Host Memory · 22. Unified Memory Programming
 - CUDA C++ Best Practices Guide — Memory Optimizations, Pinned Memory
 - Nsight Systems — User Guide
 

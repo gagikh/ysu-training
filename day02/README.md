@@ -130,7 +130,7 @@ Launch-ը ստեղծում է block-երի grid, և ամեն block ինքը thre
 Չորս thread-ը չորս կրկնությամբ մշակում են տասնվեց տարր։ Եթե զանգվածը մեծացնենք մինչև երեսուներկու տարր, կլինի ութ կրկնություն՝ նույն launch configuration-ով։ Սա լաբորատոր առաջադրանքի grid-stride loop-ն է։
 
 ## Գրականություն
-- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf) — 2. Programming Model · 5. Performance Guidelines
+- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/archive/12.8.0/pdf/CUDA_C_Programming_Guide.pdf) — 5. Programming Model · 8. Performance Guidelines
 - CUDA C++ Best Practices Guide — Occupancy, Coalesced Access to Global Memory
 
 ## Լաբորատոր առաջադրանք
