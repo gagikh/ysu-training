@@ -10,6 +10,7 @@
 ## Հիմնական հասկացություններ
 - Thread, block, grid՝ կառուցվածքը և համարակալումը
 - Launch configuration և kernel-ի կանչ
+- Kernel-ի պարամետրերը՝ միայն արժեքով, առանց հղումների
 - Thread-երի 1D և 2D ինդեքսավորում
 - Memory coalescing՝ որպես ինդեքսի բանաձևի հետևանք
 - Occupancy և block size-ի ընտրություն (առաջին ծանոթություն, hardware-ի պատճառները՝ Օր 3-ում և Օր 6-ում)
@@ -112,6 +113,33 @@ cudaError_t cudaOccupancyMaxPotentialBlockSize(int *minGridSize, int *blockSize,
                                                size_t dynamicSMemSize = 0, int blockSizeLimit = 0);
 ```
 
+## Kernel-ի պարամետրերը
+Host-ից kernel-ին տրված արգումենտները փոխանցվում են միայն արժեքով։ Launch-ի ժամանակ runtime-ը դրանք պատճենում է device-ի constant memory, և ամեն thread կարդում է այդ պատճենը։ Kernel-ը արժեք չի վերադարձնում (`void`), ուստի արդյունքը գրվում է device-ի հիշողության մեջ՝ ցուցիչի միջոցով։
+
+Որպես պարամետր կարելի է փոխանցել.
+
+- թվային տիպեր՝ `int`, `float`, `size_t` և այլն,
+- device-ի հիշողության ցուցիչներ, օրինակ՝ `cudaMalloc`-ով ստացված `float *d_a`,
+- struct-եր և class-եր արժեքով, օրինակ՝ `dim3` կամ սեփական struct։
+
+Չի կարելի փոխանցել.
+
+- հղումներ՝ `float &x`, `const Params &p`, `Params &&p`,
+- փոփոխական քանակով արգումենտներ (`...`, `va_list`) և `std::initializer_list`։
+
+Հղումն իրականում host-ի փոփոխականի հասցեն է, իսկ host-ի և device-ի հիշողությունները առանձին address space-եր են (Օր 1)։ nvcc 12.8-ը `T &` պարամետրի համար սխալ չի տալիս (սխալ է տալիս միայն `T &&`-ի համար), ուստի այս կանոնը պետք է պահել ինքներդ։ Host-ի սովորական հիշողության ցուցիչը (`malloc`-ով ստացված կամ stack-ի փոփոխականի հասցեն) նույնպես կոմպիլացվում է, բայց device-ը, ընդհանուր դեպքում, չի կարող դիմել այդ հասցեին։ Բացառությունները mapped և unified հիշողությունն են (Օր 4)։
+
+Պարամետրերի ընդհանուր չափը սահմանափակ է՝ 32 764 բայթ Volta-ից սկսած և 4 ԿԲ ավելի հին architecture-ների վրա։
+
+```c
+struct Params { int n; float scale; };
+
+__global__ void scale(float *data, Params p);   // ճիշտ՝ device-ի ցուցիչ և struct արժեքով
+__global__ void bad1(float &x);                 // սխալ՝ հղում (nvcc-ն սխալ չի տալիս)
+__global__ void bad2(const Params &p);          // սխալ՝ const հղումը նույնպես հղում է
+__global__ void bad3(Params &&p);               // սխալ՝ nvcc-ն տալիս է compile error
+```
+
 ## Ինչպես է block-ը տեղաբաշխվում SM-ի վրա
 Block-ը վերագրվում է մեկ SM-ի և մնում այնտեղ մինչև ավարտը։ Թե քանի block կարող է միաժամանակ տեղավորվել SM-ում, որոշում են չորս սահմանափակում՝ մեկ thread-ի ռեգիստրները, մեկ block-ի shared memory-ն, մեկ SM-ում thread-երի առավելագույն քանակը և resident block-երի hardware-ային սահմանը։ Որոշիչն ամենախիստն է։ Հենց դրա համար block size-ը hardware-ի հարց է, ոչ թե ճաշակի։
 
@@ -121,16 +149,16 @@ Block-ը վերագրվում է մեկ SM-ի և մնում այնտեղ մին�
 Launch-ը ստեղծում է block-երի grid, և ամեն block ինքը thread-երի միաչափ, երկչափ կամ եռաչափ զանգված է։ `blockIdx`-ը ցույց է տալիս, թե thread-ը որ block-ում է, իսկ `threadIdx`-ը՝ որ դիրքում է այդ block-ի ներսում։ Գծապատկերում բերված բանաձևն օգտագործվում է գրեթե բոլոր հաջորդ kernel-ներում։
 
 ## Անիմացիա
-![Global index-ի բանաձևը հաշվվում է երեք block-ի չորս thread-ի համար. blockIdx.x-ից, blockDim.x-ից և threadIdx.x-ից ստացվում է կոնկրետ թիվ](thread_indexing.svg)
+![Global index-ի բանաձևը հաշվվում է հերթով երեք block-ի բոլոր 12 thread-երի համար, և ամեն thread-ից սլաքը ցույց է տալիս զանգվածի այն տարրը, որը thread-ը մշակում է](thread_indexing.svg)
 
-Բանաձևը միշտ նույնն է՝ `blockIdx.x * blockDim.x + threadIdx.x`, փոխվում են միայն block-ի և thread-ի ինդեքսները։
+Անիմացիան հերթով անցնում է բոլոր 12 thread-երով։ Ամեն քայլում բանաձևի մեջ տեղադրվում են տվյալ thread-ի `blockIdx.x`-ը և `threadIdx.x`-ը, և ստացվում է զանգվածի այն տարրի ինդեքսը, որը thread-ը մշակում է։ Բանաձևը միշտ նույնն է՝ `blockIdx.x * blockDim.x + threadIdx.x`, փոխվում են միայն block-ի և thread-ի ինդեքսները։ Վերջում զանգվածի բոլոր 12 տարրերը ներկված են. ամեն տարր մշակում է ճիշտ մեկ thread։
 
 ![Չորս thread-ը 4 քայլով անցնում են 16 տարրանոց զանգվածի վրայով. ամեն կրկնությունում ամեն thread մշակում է նոր տարր](grid_stride_loop.svg)
 
 Չորս thread-ը չորս կրկնությամբ մշակում են տասնվեց տարր։ Եթե զանգվածը մեծացնենք մինչև երեսուներկու տարր, կլինի ութ կրկնություն՝ նույն launch configuration-ով։ Սա լաբորատոր առաջադրանքի grid-stride loop-ն է։
 
 ## Գրականություն
-- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/archive/12.8.0/pdf/CUDA_C_Programming_Guide.pdf) — 5. Programming Model · 8. Performance Guidelines
+- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/archive/12.8.0/pdf/CUDA_C_Programming_Guide.pdf) — 5. Programming Model · 8. Performance Guidelines · 17.5.10.3. Function Parameters
 - CUDA C++ Best Practices Guide — Occupancy, Coalesced Access to Global Memory
 
 ## Լաբորատոր առաջադրանք
@@ -151,6 +179,7 @@ Launch-ը ստեղծում է block-երի grid, և ամեն block ինքը thre
 2. Ինչու՞ է grid-stride loop-ը ճիշտ մնում, երբ `n`-ը կրկնապատկվում է, իսկ այն kernel-ը, որտեղ ամեն thread մշակում է մեկ տարր՝ ոչ։
 3. 5-րդ առաջադրանքի երկու բանաձևն էլ ճիշտ արդյունք են տալիս։ Ո՞ր չափումով կորոշեք, թե որն ընտրել։
 4. Kernel-ը գործարկում եք `<<<100, 256>>>`-ով 20 000 տարրի համար՝ սահմանների ստուգմամբ։ Քանի՞ thread ոչ մի աշխատանք չի կատարում։
+5. Ինչու՞ kernel-ի պարամետրը չի կարող լինել host-ի փոփոխականի հղում (`float &x`), իսկ `cudaMalloc`-ով ստացված ցուցիչը (`float *d_a`)՝ կարող է։
 
 ## Կոդի template
 Տես [`template.cu`](template.cu)։
