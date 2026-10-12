@@ -11,6 +11,7 @@
 - Thread, block, grid՝ կառուցվածքը և համարակալումը
 - Launch configuration և kernel-ի կանչ
 - Kernel-ի պարամետրերը՝ միայն արժեքով, առանց հղումների
+- Kernel-ի գործարկում kernel-ից (Dynamic Parallelism)
 - Thread-երի 1D և 2D ինդեքսավորում
 - Memory coalescing՝ որպես ինդեքսի բանաձևի հետևանք
 - Occupancy և block size-ի ընտրություն (առաջին ծանոթություն, hardware-ի պատճառները՝ Օր 3-ում և Օր 6-ում)
@@ -84,7 +85,7 @@ double occupancy = double(n * blockSize) / p.maxThreadsPerMultiProcessor;
 
 Երկու հարակից ֆունկցիա.
 
-- `cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags` — նույն ֆունկցիան՝ flags պարամետրով։ `cudaOccupancyDefault`-ը պահպանում է սովորական վարքը, իսկ `cudaOccupancyDisableCachingOverride`-ն անջատում է platform-ից կախված caching-ի ճշգրտումը։
+- `cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags` — նույն ֆունկցիան՝ flags պարամետրով։ `cudaOccupancyDefault`-ը պահպանում է սովորական վարքը, իսկ `cudaOccupancyDisableCachingOverride`-ը վերաբերում է այն platform-ներին, որտեղ global memory-ի caching-ը ազդում է occupancy-ի վրա։ Լռելյայն, եթե caching-ի պատճառով occupancy-ն զրո է ստացվում, հաշվարկը կատարվում է այնպես, կարծես caching-ն անջատված է։ Այս flag-ով ֆունկցիան այդ դեպքում վերադարձնում է 0։ CUDA-ի փաստաթղթերը այս վարքը կապում են Maxwell architecture-ի «Unified L1/Texture Cache»-ի հետ։
 - `cudaOccupancyMaxPotentialBlockSize` — պատասխանում է հակառակ հարցին։ Ձեր ընտրած block size-ը գնահատելու փոխարեն այն առաջարկում է ամենաբարձր occupancy տվող block size-ը և այն ամենափոքր grid-ը, որով այդ occupancy-ն ձեռք է բերվում։ Օգտակար է որպես ելակետ, ոչ թե որպես վերջնական պատասխան։ Ամենաբարձր occupancy-ն միշտ չէ, որ տալիս է ամենաարագ կատարումը։
 
 **Coalescing (memory coalescing)** — Երբ warp-ի 32 lane-երը դիմում են հաջորդական հասցեների, hardware-ը դրանք սպասարկում է մեկ 128-բայթանոց transaction-ով (4-բայթանոց տարրերի դեպքում)՝ մինչև 32 առանձին transaction-ի փոխարեն։ Coalescing-ը warp-ի հատկություն է, ոչ թե thread-ի։ Կարևորն այն է, թե մեկ հրամանի ընթացքում 32 lane-երը միասին ինչ հասցեների են դիմում, և ոչ թե այն, թե մեկ thread-ը ժամանակի ընթացքում որ հասցեներով է անցնում։
@@ -111,6 +112,16 @@ cudaError_t cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags(int *numBlock
 template <class T>
 cudaError_t cudaOccupancyMaxPotentialBlockSize(int *minGridSize, int *blockSize, T func,
                                                size_t dynamicSMemSize = 0, int blockSizeLimit = 0);
+
+// Kernel-ի ատրիբուտ, օրինակ՝ cudaFuncAttributePreferredSharedMemoryCarveout
+// (value-ն տոկոս է 0-ից 100 կամ cudaSharedmemCarveoutDefault, MaxL1, MaxShared)
+cudaError_t cudaFuncSetAttribute(const void *func, enum cudaFuncAttribute attr, int value);
+
+// Runtime-ի սահմաններ, օրինակ՝ cudaLimitDevRuntimePendingLaunchCount
+cudaError_t cudaDeviceSetLimit(enum cudaLimit limit, size_t value);
+
+// Օր 1-ից՝ device-ի կոդից տպում է ծրագրի stdout-ում
+int printf(const char *format, ...);
 ```
 
 ## Kernel-ի պարամետրերը
@@ -127,7 +138,7 @@ Host-ից kernel-ին տրված արգումենտները փոխանցվում
 - հղումներ՝ `float &x`, `const Params &p`, `Params &&p`,
 - փոփոխական քանակով արգումենտներ (`...`, `va_list`) և `std::initializer_list`։
 
-Հղումն իրականում host-ի փոփոխականի հասցեն է, իսկ host-ի և device-ի հիշողությունները առանձին address space-եր են (Օր 1)։ nvcc 12.8-ը `T &` պարամետրի համար սխալ չի տալիս (սխալ է տալիս միայն `T &&`-ի համար), ուստի այս կանոնը պետք է պահել ինքներդ։ Host-ի սովորական հիշողության ցուցիչը (`malloc`-ով ստացված կամ stack-ի փոփոխականի հասցեն) նույնպես կոմպիլացվում է, բայց device-ը, ընդհանուր դեպքում, չի կարող դիմել այդ հասցեին։ Բացառությունները mapped և unified հիշողությունն են (Օր 4)։
+Հղումն իրականում host-ի փոփոխականի հասցեն է, իսկ host-ի և device-ի հիշողությունները առանձին address space-եր են (Օր 1)։ nvcc 12.8-ը `T &` պարամետրի համար սխալ չի տալիս (սխալ է տալիս միայն `T &&`-ի համար), ուստի այս կանոնը պետք է պահպանել ձեռքով։ Host-ի սովորական հիշողության ցուցիչը (`malloc`-ով ստացված կամ stack-ի փոփոխականի հասցեն) նույնպես կոմպիլացվում է, բայց device-ը, ընդհանուր դեպքում, չի կարող դիմել այդ հասցեին։ Բացառությունները mapped և unified հիշողությունն են (Օր 4)։
 
 Պարամետրերի ընդհանուր չափը սահմանափակ է՝ 32 764 բայթ Volta-ից սկսած և 4 ԿԲ ավելի հին architecture-ների վրա։
 
@@ -140,8 +151,67 @@ __global__ void bad2(const Params &p);          // սխալ՝ const հղումը
 __global__ void bad3(Params &&p);               // սխալ՝ nvcc-ն տալիս է compile error
 ```
 
+### Ով է տալիս kernel-ի օգտագործած արժեքները
+Kernel-ի ներսում thread-ն օգտագործում է երեք տեսակի արժեք։ Դրանք տալիս են տարբեր բաղադրիչներ և պահվում են տարբեր տեղերում.
+
+| Արժեք | Ով է տալիս | Որտեղից է thread-ը կարդում |
+|---|---|---|
+| Kernel-ի արգումենտները (`float *data`, `Params p`) | host-ի կոդը։ Launch-ի ժամանակ driver-ը դրանք գրում է constant memory-ի bank 0-ում | constant bank՝ `c[0x0][0x210]` և հաջորդ հասցեները |
+| `blockDim`, `gridDim` | host-ի կոդը՝ `<<<grid, block>>>`-ով։ Driver-ը դրանք գրում է նույն bank-ում | constant bank՝ `c[0x0][0x0]` (`blockDim.x`), `c[0x0][0xc]` (`gridDim.x`) |
+| `blockIdx` | GPU-ի work distributor-ը, երբ block-ը վերագրում է SM-ին | SM-ի special register՝ `SR_CTAID` |
+| `threadIdx` | SM-ը, երբ ստեղծում է block-ի thread-երը | SM-ի special register՝ `SR_TID` |
+
+Արգումենտները, `blockDim`-ը և `gridDim`-ը նույնն են grid-ի բոլոր thread-երի համար, ուստի դրանք պահվում են մեկ տեղում՝ constant bank-ում։ `blockIdx`-ը և `threadIdx`-ը տարբեր են ամեն thread-ի համար, ուստի դրանք տալիս է hardware-ը special register-ների միջոցով։
+
+Օրինակ՝ այս kernel-ը
+
+```c
+__global__ void scale(float *data, Params p)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = gridDim.x * blockDim.x;
+    for (; i < p.n; i += stride) data[i] *= p.scale;
+}
+```
+
+nvcc 12.8-ը (`-arch=sm_90`) կոմպիլացնում է SASS-ի, որտեղ այդ արժեքները կարդացվում են այսպես.
+
+```sass
+S2R    R5, SR_CTAID.X ;         // blockIdx.x   SM-ի special register
+S2R    R0, SR_TID.X ;           // threadIdx.x  SM-ի special register
+ULDC   UR4, c[0x0][0x0] ;       // blockDim.x   constant bank
+LDC    R2, c[0x0][0xc] ;        // gridDim.x    constant bank
+LDC.64 R2, c[0x0][0x210] ;      // data         արգումենտ, constant bank
+ULDC   UR6, c[0x0][0x218] ;     // p.n          արգումենտ, constant bank
+ULDC   UR7, c[0x0][0x21c] ;     // p.scale      արգումենտ, constant bank
+```
+
+Constant bank-ի հասցեները կախված են architecture-ից, դրանք անգիր անելու կարիք չկա։ Կարևորը բաժանումն է. ընդհանուր արժեքները գալիս են host-ից driver-ի միջոցով, իսկ ամեն thread-ի սեփական ինդեքսները՝ SM-ի hardware-ից։
+
+## Kernel-ի գործարկում kernel-ից (Dynamic Parallelism)
+Kernel-ը կարող է գործարկել այլ kernel կամ ինքն իրեն՝ նույն `<<<grid, block>>>` գրելաձևով։ Սա կոչվում է Dynamic Parallelism։ Գործարկող grid-ը կոչվում է parent, գործարկվածը՝ child։
+
+```c
+__global__ void tree(int depth)
+{
+    if (threadIdx.x == 0) printf("depth %d\n", depth);
+    if (depth < 3 && threadIdx.x == 0)
+        tree<<<1, 2>>>(depth + 1);     // kernel-ը գործարկում է ինքն իրեն
+}
+```
+
+Կանոնները.
+
+- Կոմպիլացնել պետք է separate compilation ռեժիմով և device runtime գրադարանով՝ `nvcc -arch=sm_90 -rdc=true file.cu -o file -lcudadevrt`։ Առանց `-rdc=true`-ի nvcc-ն տալիս է սխալ. «kernel launch from \_\_device\_\_ or \_\_global\_\_ functions requires separate compilation mode»։ Դասընթացի `compile.sh`-ը `-rdc=true` չի փոխանցում, ուստի այս դեպքում հրամանը պետք է գրել ձեռքով։
+- Kernel-ը չի կարող կանչել ինքն իրեն որպես սովորական ֆունկցիա, քանի որ `__global__` ֆունկցիաները recursion չեն աջակցում։ Recursion-ը հնարավոր է միայն նոր launch-ի միջոցով, ինչպես վերևի օրինակում։
+- Parent grid-ը համարվում է ավարտված միայն այն ժամանակ, երբ ավարտվել են նրա բոլոր child grid-երը։
+- Device-ի կոդում `cudaDeviceSynchronize()`-ով child grid-ի ավարտին սպասել հնարավոր չէ. compute_90-ի և ավելի նոր architecture-ների համար այն հանված է։ Դրա փոխարեն child grid-ը գործարկվում է `cudaStreamTailLaunch` stream-ում (սկսվում է parent grid-ի ավարտից հետո) կամ `cudaStreamFireAndForget` stream-ում (սկսվում է անմիջապես և կատարվում է parent-ից անկախ)։
+- Դեռ չսկսված launch-երի քանակը սահմանափակ է։ Երբ այդ բուֆերը լցվում է, device-ից կատարված launch-ը ձախողվում է `cudaErrorLaunchOutOfResources` սխալով։ Բուֆերի չափը host-ից փոխվում է `cudaDeviceSetLimit(cudaLimitDevRuntimePendingLaunchCount, ...)`-ով՝ նախքան որևէ kernel գործարկելը։
+
 ## Ինչպես է block-ը տեղաբաշխվում SM-ի վրա
 Block-ը վերագրվում է մեկ SM-ի և մնում այնտեղ մինչև ավարտը։ Թե քանի block կարող է միաժամանակ տեղավորվել SM-ում, որոշում են չորս սահմանափակում՝ մեկ thread-ի ռեգիստրները, մեկ block-ի shared memory-ն, մեկ SM-ում thread-երի առավելագույն քանակը և resident block-երի hardware-ային սահմանը։ Որոշիչն ամենախիստն է։ Հենց դրա համար block size-ը hardware-ի հարց է, ոչ թե ճաշակի։
+
+Shared memory-ի սահմանափակման մեջ կա մեկ նրբություն։ SM-ում shared memory-ն և L1 cache-ը օգտագործում են նույն ֆիզիկական հիշողությունը (H100-ում՝ 256 ԿԲ), և driver-ն ամեն kernel-ի համար ինքն է որոշում, թե դրանից որքանը հատկացնել shared memory-ին։ Այս բաժանումը կոչվում է carveout։ H100-ում shared memory-ին կարելի է հատկացնել 0, 8, 16, 32, 64, 100, 132, 164, 196 կամ 228 ԿԲ։ Driver-ն ընտրում է այնպես, որ shared memory-ն չդառնա occupancy-ի սահմանափակում, իսկ մնացածը տալիս է L1-ին։ Ծրագրավորողը կարող է նախընտրելի արժեք տալ `cudaFuncSetAttribute`-ով (`cudaFuncAttributePreferredSharedMemoryCarveout`), բայց driver-ն այն ընդունում է միայն որպես ցուցում և կարող է ընտրել այլ արժեք։ Հետևաբար 4-րդ սահմանափակման մեջ մեկ SM-ի shared memory-ն ոչ թե ֆիքսված 228 ԿԲ-ն է, այլ այն ծավալը, որը driver-ը հատկացրել է տվյալ kernel-ին։
 
 ## Պատկեր
 ![Block-երի grid, ամեն block՝ thread-երի երկչափ զանգված, կողքին՝ global index-ի բանաձևը](thread_hierarchy.svg)
@@ -158,7 +228,7 @@ Launch-ը ստեղծում է block-երի grid, և ամեն block ինքը thre
 Չորս thread-ը չորս կրկնությամբ մշակում են տասնվեց տարր։ Եթե զանգվածը մեծացնենք մինչև երեսուներկու տարր, կլինի ութ կրկնություն՝ նույն launch configuration-ով։ Սա լաբորատոր առաջադրանքի grid-stride loop-ն է։
 
 ## Գրականություն
-- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/archive/12.8.0/pdf/CUDA_C_Programming_Guide.pdf) — 5. Programming Model · 8. Performance Guidelines · 17.5.10.3. Function Parameters
+- [CUDA C Programming Guide](https://docs.nvidia.com/cuda/archive/12.8.0/pdf/CUDA_C_Programming_Guide.pdf) — 5. Programming Model · 8. Performance Guidelines · 12. CUDA Dynamic Parallelism · 17.5.10.3. Function Parameters · 19.8.3. Shared Memory
 - CUDA C++ Best Practices Guide — Occupancy, Coalesced Access to Global Memory
 
 ## Լաբորատոր առաջադրանք
