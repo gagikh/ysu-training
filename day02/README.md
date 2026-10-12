@@ -200,6 +200,10 @@ __global__ void tree(int depth)
 }
 ```
 
+![Չորս grid՝ depth 0-ից depth 3։ Ամեն grid-ի thread 0-ն գործարկում է հաջորդ grid-ը, depth 3-ը նոր launch չի անում և ավարտվում է առաջինը, ապա հակառակ հերթականությամբ ավարտվում են depth 2-ը, depth 1-ը և depth 0-ն](recursive_launch.svg)
+
+Ամեն grid-ի thread 0-ն տպում է իր տողը և գործարկում հաջորդ grid-ը։ Parent grid-ի thread-երը կարող են ավարտել իրենց կոդը child-ից առաջ, բայց grid-ը համարվում է ավարտված միայն child grid-ի ավարտից հետո (դեղին վիճակ)։ Ուստի grid-երն ավարտվում են հակառակ հերթականությամբ՝ depth 3-ից մինչև depth 0, և host-ի `cudaDeviceSynchronize()`-ը վերադառնում է միայն դրանից հետո։
+
 Կանոնները.
 
 - Կոմպիլացնել պետք է separate compilation ռեժիմով և device runtime գրադարանով՝ `nvcc -arch=sm_90 -rdc=true file.cu -o file -lcudadevrt`։ Առանց `-rdc=true`-ի nvcc-ն տալիս է սխալ. «kernel launch from \_\_device\_\_ or \_\_global\_\_ functions requires separate compilation mode»։ Դասընթացի `compile.sh`-ը `-rdc=true` չի փոխանցում, ուստի այս դեպքում հրամանը պետք է գրել ձեռքով։
