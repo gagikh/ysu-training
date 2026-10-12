@@ -71,7 +71,7 @@ inline std::string report_device_capabilities()
     std::cerr << "Device name: " << prop.name << std::endl;
 
     const auto name = arch(prop.major, prop.minor);
-    std::cerr << "Architecture: " << name << std::endl;
+    std::cerr << "Architecture: " << name << "(" << prop.major << "." << prop.minor << ")" << std::endl;
     std::cerr << "L2 Cache Size: " << UBytes(prop.l2CacheSize) << std::endl;
 
     int sharedMemoryPerSM = 0;
