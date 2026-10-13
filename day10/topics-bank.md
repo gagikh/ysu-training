@@ -1,91 +1,93 @@
-# Topic Examples
+# Թեմաների օրինակներ
 
-Examples for course projects, diploma work and master's theses in AI and computer vision.
-Take one as it stands, adapt it, or ignore the list entirely.
+Օրինակներ AI-ի և computer vision-ի ոլորտում կուրսային, դիպլոմային և մագիստրոսական աշխատանքների համար։ Թեման կարելի է վերցնել ինչպես կա, հարմարեցնել կամ ընդհանրապես չօգտագործել այս ցանկը։
 
-Scope decides the category: the first group is implementation and measurement, which
-suits a course project; the second group asks a research question and suits diploma work
-or a thesis. The supervisor decides which fits which.
+Թեմայի տեսակը որոշում է աշխատանքի ծավալը։ Առաջին խմբի թեմաները իրականացում և չափում են և հարմար են կուրսային աշխատանքի համար։ Երկրորդ խմբի թեմաները հետազոտական հարց են դնում և հարմար են դիպլոմային կամ մագիստրոսական աշխատանքի համար։ Թե որ թեման որ աշխատանքին է համապատասխանում, որոշում է ղեկավարը։
 
-Memory and runtime are not given. Estimate them against the cluster GPU's
-own numbers, obtained on Day 1.
+Հիշողության և կատարման ժամանակի պահանջները նշված չեն։ Դրանք պետք է գնահատել կլաստերի GPU-ի իրական պարամետրերով, որոնք ստացվում են Օր 1-ում։
 
 ---
 
-## Implementation and measurement
+## Իրականացում և չափում
 
-### 1. CUDA image filter library
-*Days 3–6*
+### 1. Պատկերի ֆիլտրերի CUDA գրադարան
 
-- **Question.** How much do tiling and the separable form gain, from a 3×3 up to a 15×15 kernel, and where does the gain stop?
-- **Data.** Any set of images. No specific dataset needed.
-- **Sufficient.** Four versions — naive, tiled, separable, NPP. Bandwidth measured for each.
-- **Typical mistake.** Timing without warm-up and without `cudaDeviceSynchronize()`.
+*Օր 3–6*
+
+- **Հարց։** Որքա՞ն արագացում են տալիս tiling-ը և separable ձևը 3×3-ից մինչև 15×15 չափի ֆիլտրերի դեպքում, և որտե՞ղ է արագացումը դադարում աճել։
+- **Տվյալներ։** Պատկերների ցանկացած հավաքածու։ Հատուկ dataset պետք չէ։
+- **Բավարար արդյունք։** Չորս տարբերակ՝ naive, tiled, separable, NPP, և ամեն մեկի bandwidth-ի չափում։
+- **Բնորոշ սխալ։** Ժամանակի չափում առանց warm-up-ի և առանց `cudaDeviceSynchronize()`-ի։
 
 ### 2. Connected components labeling
-*Day 7*
 
-- **Question.** When does label propagation beat union-find, as a function of the number and shape of components?
-- **Data.** Binary masks, synthetic and from segmentation output.
-- **Sufficient.** Both algorithms, correctness checked against a CPU implementation, runtime as a curve against component count rather than a single number.
-- **Typical mistake.** Not measuring atomic contention, and so not being able to explain the slowdown.
+*Օր 7*
+
+- **Հարց։** Ե՞րբ է label propagation-ն ավելի արագ, քան union-find-ը՝ կախված բաղադրիչների քանակից և ձևից։
+- **Տվյալներ։** Բինար մասկեր՝ սինթետիկ և segmentation-ի ելքից ստացված։
+- **Բավարար արդյունք։** Երկու ալգորիթմն էլ, ճշտության ստուգում CPU-ի իրականացման հետ, և կատարման ժամանակի կախվածությունը բաղադրիչների քանակից՝ կորի տեսքով, ոչ թե մեկ թիվ։
+- **Բնորոշ սխալ։** Atomic-ների մրցակցությունը չի չափվում, ուստի դանդաղումը հնարավոր չէ բացատրել։
 
 ### 3. Non-maximum suppression
-*Day 7*
 
-- **Question.** What fraction of a detection pipeline's time is NMS, and how much of it does the GPU remove?
-- **Data.** Output boxes from a pre-trained detector. No training needed.
-- **Sufficient.** A CUDA NMS, compared against torchvision's GPU version, with proof the results are identical.
-- **Typical mistake.** Using unoptimised CPU code as the baseline and reporting a 100× speedup.
+*Օր 7*
 
-### 4. Decode and resize on the GPU
-*Days 4, 9*
+- **Հարց։** Detection pipeline-ի ժամանակի ո՞ր մասն է կազմում NMS-ը, և որքա՞ն է այն կրճատվում GPU-ի վրա։
+- **Տվյալներ։** Նախապես ուսուցանված detector-ի ելքային bounding box-եր։ Ուսուցում պետք չէ։
+- **Բավարար արդյունք։** CUDA-ով իրականացված NMS, համեմատություն torchvision-ի GPU տարբերակի հետ և ապացույց, որ արդյունքները նույնն են։
+- **Բնորոշ սխալ։** Որպես baseline օգտագործվում է չօպտիմալացված CPU կոդ, և հայտարարվում է 100× արագացում։
 
-- **Question.** What fraction of a training step is JPEG decode and resize, and what does moving them to the GPU with nvJPEG change?
-- **Data.** Any large set of JPEGs.
-- **Sufficient.** Nsight Systems timeline before and after, GPU utilisation, throughput in images per second for the whole step.
-- **Typical mistake.** Measuring decode in isolation and not showing the effect on the full step.
+### 4. Decode և resize GPU-ի վրա
 
-### 5. Histogram equalisation and CLAHE
-*Day 7*
+*Օր 4, 9*
 
-- **Question.** How does atomic contention depend on image content — flat sky against rich texture?
-- **Data.** Images deliberately chosen to differ in content.
-- **Sufficient.** Global and privatised versions, contention measured per image type.
-- **Typical mistake.** Averaging over all images and losing the effect being studied.
+- **Հարց։** Ուսուցման քայլի ժամանակի ո՞ր մասն են կազմում JPEG-ի decode-ը և resize-ը, և ի՞նչ է փոխվում, երբ դրանք nvJPEG-ով տեղափոխվում են GPU։
+- **Տվյալներ։** JPEG պատկերների ցանկացած մեծ հավաքածու։
+- **Բավարար արդյունք։** Nsight Systems-ի timeline-ը փոփոխությունից առաջ և հետո, GPU-ի utilization-ը և ամբողջ քայլի throughput-ը՝ պատկեր/վայրկյան։
+- **Բնորոշ սխալ։** Decode-ը չափվում է առանձին, և ցույց չի տրվում դրա ազդեցությունն ամբողջ քայլի վրա։
 
-### 6. Precision and accuracy
-*Day 9*
+### 5. Histogram equalization և CLAHE
 
-- **Question.** How do accuracy and speed change between fp32, tf32 and bf16 for a small network?
-- **Data.** A deliberately small dataset, so that repeated runs are possible.
-- **Sufficient.** Three modes, at least three runs each, mean and spread of accuracy, and profiler evidence that tensor cores were actually used.
-- **Typical mistake.** One run per mode, and a conclusion drawn from random variation.
+*Օր 7*
 
-### 7. Adaptive binarisation of manuscript pages
-*Days 4, 5*
+- **Հարց։** Ինչպե՞ս է atomic-ների մրցակցությունը կախված պատկերի բովանդակությունից, օրինակ՝ միագույն երկինք և հարուստ տեքստուրա։
+- **Տվյալներ։** Պատկերներ, որոնք դիտմամբ ընտրված են տարբեր բովանդակությամբ։
+- **Բավարար արդյունք։** Global և privatised տարբերակներ, մրցակցության չափում ըստ պատկերի տեսակի։
+- **Բնորոշ սխալ։** Արդյունքները միջինացվում են բոլոր պատկերների վրա, և ուսումնասիրվող էֆեկտը կորչում է։
 
-- **Question.** How much does Sauvola or Niblack binarisation gain on the GPU using an integral image, over a large page count?
-- **Data.** Scanned pages, including digitised Armenian manuscripts.
-- **Sufficient.** GPU integral image, speedup measured, visual comparison against OpenCV.
-- **Typical mistake.** Not using an integral image, producing an algorithm whose cost depends on window size.
+### 6. Թվային ճշգրտությունը և մոդելի ճշտությունը
+
+*Օր 9*
+
+- **Հարց։** Ինչպե՞ս են փոխվում փոքր ցանցի ճշտությունը (accuracy) և արագությունը fp32-ի, tf32-ի և bf16-ի դեպքում։
+- **Տվյալներ։** Դիտմամբ փոքր dataset, որպեսզի հնարավոր լինի ուսուցումը կրկնել։
+- **Բավարար արդյունք։** Երեք ռեժիմ, յուրաքանչյուրը՝ առնվազն երեք անգամ, ճշտության միջին արժեքը և ցրվածությունը, և profiler-ի տվյալներ, որոնք ցույց են տալիս, որ tensor core-երն իրոք օգտագործվել են։
+- **Բնորոշ սխալ։** Ամեն ռեժիմ գործարկվում է մեկ անգամ, և եզրակացությունն արվում է պատահական տարբերությունից։
+
+### 7. Ձեռագիր էջերի adaptive binarization
+
+*Օր 4, 5*
+
+- **Հարց։** Որքա՞ն արագացում է տալիս Sauvola-ի կամ Niblack-ի binarization-ը GPU-ի վրա integral image-ով, երբ էջերը շատ են։
+- **Տվյալներ։** Սկանավորված էջեր, այդ թվում՝ թվայնացված հայերեն ձեռագրեր։
+- **Բավարար արդյունք։** Integral image-ի GPU իրականացում, արագացման չափում, արդյունքի տեսողական համեմատություն OpenCV-ի հետ։
+- **Բնորոշ սխալ։** Integral image չի օգտագործվում, և ալգորիթմի ծախսը կախված է պատուհանի չափից։
 
 ---
 
-## Research question
+## Հետազոտական հարց
 
-### 8. Armenian scene text detection and recognition
+### 8. Հայերեն տեքստի հայտնաբերում և ճանաչում լուսանկարներում
 
-- **Question.** How much real training data is needed for acceptable quality on Armenian signage, and how far does synthetic data substitute for it?
-- **Data.** A collection gathered by the student, plus synthetic generation using Armenian typefaces. Building the dataset is part of the work.
-- **Sufficient.** A published dataset, a measurable improvement over a baseline, error analysis by typeface and lighting.
-- **Typical mistake.** Most of the time goes to collecting data. The proposal should fix a minimum dataset size and a date after which collection stops.
-- No comparable public dataset exists; the result is publishable.
+- **Հարց։** Որքա՞ն իրական տվյալ է անհրաժեշտ հայերեն ցուցանակների վրա ընդունելի որակի համար, և որքանո՞վ կարող են սինթետիկ տվյալները փոխարինել իրականին։
+- **Տվյալներ։** Ուսանողի հավաքած տվյալներ և հայերեն տառատեսակներով ստեղծված սինթետիկ տվյալներ։ Dataset-ի ստեղծումն աշխատանքի մասն է։
+- **Բավարար արդյունք։** Հրապարակված dataset, baseline-ի համեմատ չափելի բարելավում, սխալների վերլուծություն ըստ տառատեսակի և լուսավորության։
+- **Բնորոշ սխալ։** Ժամանակի մեծ մասը ծախսվում է տվյալների հավաքման վրա։ Առաջարկում պետք է ամրագրել dataset-ի նվազագույն ծավալը և այն ամսաթիվը, որից հետո հավաքումը դադարեցվում է։
+- Նման հանրային dataset չկա, ուստի արդյունքը հրապարակելի է։
 
-### 9. Layout analysis of Armenian manuscripts
+### 9. Հայկական ձեռագրերի layout analysis
 
-- **Question.** Does line and column segmentation transfer to Armenian manuscripts by fine-tuning a model trained on other writing systems, and how many annotated pages are enough?
-- **Data.** Digitised pages with manual annotation.
-- **Sufficient.** IoU per line, comparison against existing tools, an error typology by manuscript style.
-- **Typical mistake.** Starting from the full page without tiling. The tiling strategy belongs in the proposal.
-
+- **Հարց։** Կարելի՞ է տողերի և սյունակների segmentation-ը կիրառել հայկական ձեռագրերի վրա՝ fine-tuning անելով այլ գրային համակարգերի վրա ուսուցանված մոդելը, և քանի՞ նշագրված էջ է բավարար։
+- **Տվյալներ։** Թվայնացված էջեր՝ ձեռքով նշագրմամբ։
+- **Բավարար արդյունք։** IoU ըստ տողերի, համեմատություն առկա գործիքների հետ, սխալների դասակարգում ըստ ձեռագրի ոճի։
+- **Բնորոշ սխալ։** Աշխատանքը սկսվում է ամբողջ էջից՝ առանց tiling-ի։ Tiling-ի ռազմավարությունը պետք է նշված լինի առաջարկում։
